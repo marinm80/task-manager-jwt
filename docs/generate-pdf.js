@@ -49,10 +49,11 @@ function sectionBreak(needed = 80) {
 
 function h1(text) {
   addPage();
-  doc.rect(55, doc.y, PAGE_W, 36).fill(C.headerBg);
+  const y = doc.y;
+  doc.rect(55, y, PAGE_W, 36).fill(C.headerBg);
   doc.font('Helvetica-Bold').fontSize(16).fillColor(C.white)
-     .text(text, 65, doc.y - 30, { width: PAGE_W - 20 });
-  doc.moveDown(0.6);
+     .text(text, 65, y + 10, { width: PAGE_W - 20 });
+  doc.y = y + 44;
 }
 
 function h2(text) {
@@ -109,23 +110,25 @@ function table(headers, rows) {
   sectionBreak(40);
   const colW = PAGE_W / headers.length;
   // Header row
-  doc.rect(55, doc.y, PAGE_W, 20).fill(C.primary);
+  const headerY = doc.y;
+  doc.rect(55, headerY, PAGE_W, 20).fill(C.primary);
   headers.forEach((h, i) => {
     doc.font('Helvetica-Bold').fontSize(9).fillColor(C.white)
-       .text(h, 55 + i * colW + 4, doc.y - 16, { width: colW - 8 });
+       .text(h, 55 + i * colW + 4, headerY + 6, { width: colW - 8, lineBreak: false });
   });
-  doc.moveDown(0.1);
+  doc.y = headerY + 22;
   // Data rows
   rows.forEach((row, ri) => {
     if (doc.y + 18 > doc.page.height - 70) addPage();
+    const rowY = doc.y;
     const rowBg = ri % 2 === 0 ? C.white : '#f9fafb';
-    doc.rect(55, doc.y, PAGE_W, 18).fill(rowBg);
-    doc.rect(55, doc.y, PAGE_W, 18).stroke(C.border);
+    doc.rect(55, rowY, PAGE_W, 18).fill(rowBg);
+    doc.rect(55, rowY, PAGE_W, 18).stroke(C.border);
     row.forEach((cell, i) => {
       doc.font('Helvetica').fontSize(8.5).fillColor(C.secondary)
-         .text(String(cell), 55 + i * colW + 4, doc.y - 14, { width: colW - 8 });
+         .text(String(cell), 55 + i * colW + 4, rowY + 4, { width: colW - 8, lineBreak: false });
     });
-    doc.moveDown(0.05);
+    doc.y = rowY + 18;
   });
   doc.moveDown(0.5);
 }
