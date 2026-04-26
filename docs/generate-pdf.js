@@ -48,12 +48,13 @@ function sectionBreak(needed = 80) {
 }
 
 function h1(text) {
-  addPage();
+  sectionBreak(150);
+  doc.moveDown(0.8);
   const y = doc.y;
   doc.rect(55, y, PAGE_W, 36).fill(C.headerBg);
   doc.font('Helvetica-Bold').fontSize(16).fillColor(C.white)
      .text(text, 65, y + 10, { width: PAGE_W - 20 });
-  doc.y = y + 44;
+  doc.y = y + 50;
 }
 
 function h2(text) {
@@ -90,14 +91,13 @@ function bullet(text) {
 }
 
 function code(text) {
-  sectionBreak(30);
   const lines = text.split('\n');
   const lineH = 13;
   const boxH = lines.length * lineH + 16;
-  if (doc.y + boxH > doc.page.height - 70) addPage();
+  sectionBreak(boxH);
+  const startY = doc.y + 8;
   doc.rect(55, doc.y, PAGE_W, boxH).fill(C.codeBg);
   doc.rect(55, doc.y, 3, boxH).fill(C.accent);
-  const startY = doc.y + 8;
   lines.forEach((line, i) => {
     doc.font('Courier').fontSize(8).fillColor(C.code)
        .text(line, 64, startY + i * lineH, { width: PAGE_W - 18, lineBreak: false });
