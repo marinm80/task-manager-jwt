@@ -39,8 +39,11 @@ function addPage() {
 
 function drawPageNumber() {
   const n = doc.bufferedPageRange().count;
+  // Dibujar dentro del margen inferior (margin=55) para evitar overflow de página
+  const numY = doc.page.height - doc.page.margins.bottom - 14;
   doc.font('Helvetica').fontSize(9).fillColor(C.muted)
-     .text(`Página ${n}`, 0, doc.page.height - 40, { align: 'center', width: doc.page.width });
+     .text(`Página ${n}`, 0, numY, { align: 'center', width: doc.page.width });
+  doc.y = 55; // restaurar cursor al margen superior
 }
 
 function sectionBreak(needed = 80) {
