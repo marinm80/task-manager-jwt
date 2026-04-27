@@ -72,24 +72,24 @@ function h2(text) {
 function h3(text) {
   sectionBreak(40);
   doc.font('Helvetica-Bold').fontSize(11).fillColor(C.secondary)
-     .text(text, { width: PAGE_W });
+     .text(text, 55, doc.y, { width: PAGE_W });
   doc.moveDown(0.3);
 }
 
 function p(text, opts = {}) {
   sectionBreak(20);
   doc.font('Helvetica').fontSize(10).fillColor(C.secondary)
-     .text(text, { width: PAGE_W, lineGap: 3, ...opts });
+     .text(text, 55, doc.y, { width: PAGE_W, lineGap: 3, ...opts });
   doc.moveDown(0.3);
 }
 
 function bullet(text) {
   sectionBreak(16);
-  const x = doc.x;
+  const bY = doc.y;
   doc.font('Helvetica').fontSize(10).fillColor(C.accent)
-     .text('•', x, doc.y, { width: 12, continued: false });
+     .text('•', 55, bY, { width: 12, continued: false });
   doc.font('Helvetica').fontSize(10).fillColor(C.secondary)
-     .text(text, x + 14, doc.y - doc.currentLineHeight(), { width: PAGE_W - 14, lineGap: 2 });
+     .text(text, 69, bY, { width: PAGE_W - 14, lineGap: 2 });
   doc.moveDown(0.2);
 }
 
