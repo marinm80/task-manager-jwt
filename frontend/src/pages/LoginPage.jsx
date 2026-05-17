@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { loginUser } from '../features/auth/authSlice';
 
 const schema = z.object({
@@ -13,7 +13,9 @@ const schema = z.object({
 export default function LoginPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { loading, error } = useSelector((s) => s.auth);
+  const successMessage = location.state?.message;
   const { register, handleSubmit, formState: { errors } } = useForm({ resolver: zodResolver(schema) });
 
   const onSubmit = async (data) => {
@@ -26,6 +28,9 @@ export default function LoginPage() {
       <div className="bg-white p-8 rounded-lg shadow w-full max-w-sm">
         <h1 className="text-2xl font-bold text-center mb-2">Task Manager</h1>
         <p className="text-center text-gray-500 text-sm mb-6">Sign in to your account</p>
+        {successMessage && (
+          <p className="text-green-600 text-sm text-center mb-4">{successMessage}</p>
+        )}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <input {...register('email')} placeholder="Email" type="email" autoComplete="email"
@@ -36,6 +41,9 @@ export default function LoginPage() {
             <input {...register('password')} placeholder="Password" type="password" autoComplete="current-password"
               className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
+            <div className="text-right mt-1">
+              <Link to="/forgot-password" className="text-xs text-blue-600 hover:underline">Forgot password?</Link>
+            </div>
           </div>
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
           <button type="submit" disabled={loading}

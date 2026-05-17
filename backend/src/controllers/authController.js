@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt');
 const prisma = require('../config/db');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/jwt');
-const { registerSchema, loginSchema } = require('../schemas/authSchemas');
+const { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } = require('../schemas/authSchemas');
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -75,4 +75,48 @@ const logout = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, refresh, logout };
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email, password } = forgotPasswordSchema.parse(req.body);
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ message: 'No account found with that email.' });
+
+    const hashed = await bcrypt.hash(password, 10);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashed, refreshToken: null },
+    });
+
+    res.json({ message: 'Password updated. You can now log in.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, password } = resetPasswordSchema.parse(req.body);
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: token,
+        resetTokenExpiry: { gt: new Date() },
+      },
+    });
+
+    if (!user) return res.status(400).json({ message: 'Invalid or expired reset token.' });
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashed, resetToken: null, resetTokenExpiry: null, refreshToken: null },
+    });
+
+    res.json({ message: 'Password updated. You can now log in.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { register, login, refresh, logout, forgotPassword, resetPassword };
