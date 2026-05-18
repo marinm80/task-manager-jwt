@@ -29,6 +29,6 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testPathPattern": "tests/.*\\.test\\.js$"
+    "testRegex": "tests/.*\\.test\\.js$"
   }
 }
