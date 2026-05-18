@@ -1,9 +1,10 @@
-version: '3.9'
-
 services:
-
-  postgres:
+  # 1. BASE DE DATOS (PostgreSQL)
+  task-db:
     image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    container_name: task-manager-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -14,20 +15,23 @@ services:
     networks:
       - task_internal_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  backend:
+  # 2. BACKEND (Express.js)
+  task-backend:
     build:
       context: ./backend
+    container_name: task-manager-backend
     restart: unless-stopped
     depends_on:
-      postgres:
+      task-db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Apunta a 'task-db' de forma interna y automática
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@task-db:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
@@ -39,27 +43,28 @@ services:
       EMAIL_PORT: ${EMAIL_PORT}
       EMAIL_USER: ${EMAIL_USER}
       EMAIL_PASS: ${EMAIL_PASS}
-    ports:
-      - "3000:3000"
     networks:
-      - task_internal_net
+      - proxy_network       # Red para que Nginx Proxy Manager lo localice
+      - task_internal_net   # Red privada para hablar con la base de datos
 
-  frontend:
+  # 3. FRONTEND (React + Vite)
+  task-frontend:
     build:
       context: ./frontend
       args:
         VITE_API_URL: ${VITE_API_URL}
+    container_name: task-manager-frontend
     restart: unless-stopped
     depends_on:
-      - backend
-    ports:
-      - "80:80"
+      - task-backend
     networks:
-      - task_internal_net
+      - proxy_network       # Red para que Nginx Proxy Manager lo localice
 
 networks:
+  proxy_network:
+    external: true          # Conecta con tu Nginx global de AWS
   task_internal_net:
-    driver: bridge
+    driver: bridge          # Red privada exclusiva para este proyecto
 
 volumes:
   postgres_data:
