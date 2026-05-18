@@ -1,7 +1,7 @@
 ---
 title: Task Manager JWT — Documentación Técnica Completa
 author: Euclides Marín
-date: Abril 2026
+date: Mayo 2026
 ---
 
 # Task Manager JWT
@@ -44,9 +44,10 @@ Stack: PostgreSQL · Express.js · React · Node.js (PERN)
 9. [API Reference](#9-api-reference)
 10. [Variables de Entorno](#10-variables-de-entorno)
 11. [Instalación y Puesta en Marcha](#11-instalación-y-puesta-en-marcha)
-12. [Tests](#12-tests)
-13. [Deploy con Nginx](#13-deploy-con-nginx)
-14. [Seguridad](#14-seguridad)
+12. [Docker — Contenedorización](#12-docker--contenedorización)
+13. [Tests](#13-tests)
+14. [Deploy con Docker y Nginx Proxy Manager](#14-deploy-con-docker-y-nginx-proxy-manager)
+15. [Seguridad](#15-seguridad)
 
 ---
 
@@ -63,6 +64,7 @@ Task Manager JWT es una aplicación web fullstack que permite a los usuarios ges
 | Filtros y búsqueda | Por estado, prioridad, fechas y texto libre |
 | Paginación | Resultados paginados con `page` y `limit` |
 | Exportación CSV | Descarga de todas las tareas en formato CSV |
+| Recuperación de contraseña | Cambio directo de contraseña o via token por email |
 | Panel de administración | Visibilidad total sobre usuarios y tareas (solo admin) |
 | Persistencia de sesión | Renovación automática del access token vía refresh token |
 
@@ -87,9 +89,23 @@ Task Manager JWT es una aplicación web fullstack que permite a los usuarios ges
                 │ Prisma ORM
                 ▼
 ┌─────────────────────────────────┐
-│        PostgreSQL               │
+│        PostgreSQL 16            │
 │   tablas: users · tasks         │
 └─────────────────────────────────┘
+```
+
+### Arquitectura Docker (producción)
+
+```
+Internet
+    │
+Nginx Proxy Manager  (red: proxy_network)
+    ├── task-frontend  :80  (Nginx Alpine + build Vite)
+    └── task-backend   :3000  (Node 20 Alpine)
+                │
+        task_internal_net  (red privada bridge)
+                │
+        task-db  :5432  (PostgreSQL 16 Alpine)
 ```
 
 ### Flujo de una petición autenticada
@@ -113,16 +129,16 @@ Task Manager JWT es una aplicación web fullstack que permite a los usuarios ges
 
 | Paquete | Versión | Rol |
 |---|---|---|
-| express | ^4.18 | Servidor HTTP y routing |
-| @prisma/client | ^5.x | ORM — interfaz con PostgreSQL |
-| prisma | ^5.x | CLI de migraciones |
+| express | ^4.21 | Servidor HTTP y routing |
+| @prisma/client | ^5.22 | ORM — interfaz con PostgreSQL |
+| prisma | ^5.22 | CLI de migraciones |
 | jsonwebtoken | ^9.x | Generación y verificación de JWT |
 | bcrypt | ^5.x | Hash seguro de contraseñas |
 | zod | ^3.x | Validación de datos en runtime |
 | helmet | ^7.x | Headers de seguridad HTTP |
 | cors | ^2.x | Control de políticas CORS |
+| cookie-parser | ^1.x | Lectura de cookies HTTP |
 | express-rate-limit | ^7.x | Protección contra fuerza bruta |
-| cookie-parser | — | Lectura de cookies HTTP |
 | dotenv | ^16.x | Variables de entorno |
 | nodemailer | ^6.x | Envío de emails (recuperación de contraseña) |
 
@@ -131,7 +147,7 @@ Task Manager JWT es una aplicación web fullstack que permite a los usuarios ges
 | Paquete | Versión | Rol |
 |---|---|---|
 | react | ^18.x | Librería de interfaz de usuario |
-| vite | ^5.x | Bundler y servidor de desarrollo |
+| vite | ^8.x | Bundler y servidor de desarrollo |
 | @reduxjs/toolkit | ^2.x | Gestión de estado global |
 | react-redux | ^9.x | Integración Redux con React |
 | react-router-dom | ^6.x | Enrutamiento client-side (SPA) |
@@ -147,7 +163,12 @@ Task Manager JWT es una aplicación web fullstack que permite a los usuarios ges
 
 ```
 task-manager-jwt/
+├── docker-compose.yml                  ← Orquestación de contenedores
+├── .env                                ← Variables de entorno para Docker
+│
 ├── backend/
+│   ├── Dockerfile                      ← Imagen Node 20 Alpine
+│   ├── entrypoint.sh                   ← Migraciones + arranque del servidor
 │   ├── server.js                       ← Punto de entrada
 │   ├── .env / .env.example
 │   ├── package.json
@@ -158,7 +179,8 @@ task-manager-jwt/
 │   │   ├── config/
 │   │   │   └── db.js                   ← Instancia Prisma
 │   │   ├── controllers/
-│   │   │   ├── authController.js       ← register, login, refresh, logout
+│   │   │   ├── authController.js       ← register, login, refresh, logout,
+│   │   │   │                              forgotPassword, resetPassword
 │   │   │   ├── taskController.js       ← CRUD tareas + exportCSV
 │   │   │   └── adminController.js      ← getUsers, getUserTasks, updateRole
 │   │   ├── middleware/
@@ -170,7 +192,8 @@ task-manager-jwt/
 │   │   │   ├── taskRoutes.js
 │   │   │   └── adminRoutes.js
 │   │   ├── schemas/
-│   │   │   ├── authSchemas.js          ← Zod: register, login
+│   │   │   ├── authSchemas.js          ← Zod: register, login,
+│   │   │   │                              forgotPassword, resetPassword
 │   │   │   └── taskSchemas.js          ← Zod: createTask, updateTask
 │   │   └── utils/
 │   │       ├── jwt.js                  ← Generación/verificación tokens
@@ -180,6 +203,8 @@ task-manager-jwt/
 │       └── tasks.test.js
 │
 └── frontend/
+    ├── Dockerfile                       ← Build multietapa (Node → Nginx)
+    ├── nginx.conf                       ← Config Nginx para SPA y caché
     ├── index.html                       ← HTML raíz (Vite)
     ├── vite.config.js
     ├── tailwind.config.js
@@ -204,7 +229,9 @@ task-manager-jwt/
         │   ├── LoginPage.jsx
         │   ├── RegisterPage.jsx
         │   ├── DashboardPage.jsx
-        │   └── AdminPage.jsx
+        │   ├── AdminPage.jsx
+        │   ├── ForgotPasswordPage.jsx   ← Cambio directo de contraseña
+        │   └── ResetPasswordPage.jsx    ← Restablecimiento por token
         ├── services/
         │   ├── authService.js           ← Llamadas API de autenticación
         │   └── taskService.js           ← Llamadas API de tareas
@@ -222,14 +249,16 @@ El archivo `backend/prisma/schema.prisma` define dos modelos principales:
 
 ```prisma
 model User {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
-  password     String           // Hash bcrypt, nunca texto plano
-  name         String
-  role         Role     @default(USER)
-  refreshToken String?          // Último refreshToken válido emitido
-  createdAt    DateTime @default(now())
-  tasks        Task[]           // Relación 1:N con Task
+  id               Int       @id @default(autoincrement())
+  email            String    @unique
+  password         String            // Hash bcrypt, nunca texto plano
+  name             String
+  role             Role      @default(USER)
+  refreshToken     String?           // Último refreshToken válido emitido
+  resetToken       String?           // Token para recuperación de contraseña
+  resetTokenExpiry DateTime?         // Expiración del token de recuperación
+  createdAt        DateTime  @default(now())
+  tasks            Task[]            // Relación 1:N con Task
 }
 
 model Task {
@@ -253,19 +282,19 @@ enum Priority   { LOW  MEDIUM  HIGH }
 ### Diagrama relacional
 
 ```
-┌──────────────────┐         ┌──────────────────────┐
-│       User       │         │         Task         │
-├──────────────────┤         ├──────────────────────┤
-│ id (PK)          │────────<│ id (PK)              │
-│ email (UNIQUE)   │         │ title                │
-│ password         │         │ description          │
-│ name             │         │ status (enum)        │
-│ role (enum)      │         │ priority (enum)      │
-│ refreshToken     │         │ dueDate              │
-│ createdAt        │         │ userId (FK)          │
-└──────────────────┘         │ createdAt            │
-                             │ updatedAt            │
-                             └──────────────────────┘
+┌───────────────────────┐         ┌──────────────────────┐
+│         User          │         │         Task         │
+├───────────────────────┤         ├──────────────────────┤
+│ id (PK)               │────────<│ id (PK)              │
+│ email (UNIQUE)        │         │ title                │
+│ password              │         │ description          │
+│ name                  │         │ status (enum)        │
+│ role (enum)           │         │ priority (enum)      │
+│ refreshToken          │         │ dueDate              │
+│ resetToken            │         │ userId (FK)          │
+│ resetTokenExpiry      │         │ createdAt            │
+│ createdAt             │         │ updatedAt            │
+└───────────────────────┘         └──────────────────────┘
 ```
 
 ### Comandos de base de datos
@@ -296,15 +325,24 @@ npx prisma migrate reset
 El archivo raíz del backend configura todos los middlewares globales y monta las rutas:
 
 ```javascript
+// Necesario cuando la app corre detrás de un proxy (Nginx)
+app.set('trust proxy', 1);
+
 // Seguridad: Helmet agrega headers HTTP protectores
 app.use(helmet());
 
 // CORS: solo acepta peticiones del frontend definido en CLIENT_URL
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 
+app.use(express.json());
+app.use(cookieParser());
+
 // Rate limiting: máximo 20 peticiones cada 15 min en /api/auth
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 app.use('/api/auth', authLimiter);
+
+// Health check — para que el orquestador verifique que el servidor está vivo
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // Rutas
 app.use('/api/auth',  authRoutes);
@@ -315,7 +353,7 @@ app.use('/api/admin', adminRoutes);
 app.use(errorHandler);
 ```
 
-**Por qué este orden importa:** El `errorHandler` debe ir al final para capturar errores de todas las rutas. El `authLimiter` debe ir antes de `authRoutes` para proteger solo esos endpoints.
+**Por qué este orden importa:** El `errorHandler` debe ir al final para capturar errores de todas las rutas. El `authLimiter` debe ir antes de `authRoutes` para proteger solo esos endpoints. `trust proxy` permite que `express-rate-limit` lea la IP real del cliente detrás de Nginx.
 
 ---
 
@@ -361,6 +399,18 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email:    z.string().email(),
   password: z.string().min(1),
+});
+
+// Cambio directo de contraseña: verifica que el email existe en BD
+const forgotPasswordSchema = z.object({
+  email:    z.string().email(),
+  password: z.string().min(8).max(100),
+});
+
+// Restablecimiento por token: el token llega por URL desde el email
+const resetPasswordSchema = z.object({
+  token:    z.string().min(1),
+  password: z.string().min(8).max(100),
 });
 ```
 
@@ -462,6 +512,26 @@ Todos los controllers envían sus errores vía `next(err)` en lugar de responder
 2. Pone `refreshToken: null` en la BD (invalida el token)
 3. Limpia la cookie del cliente
 
+#### `forgotPassword`
+
+Flujo de recuperación directa (sin envío de email):
+
+1. Valida el body con `forgotPasswordSchema.parse()` (email + nueva contraseña)
+2. Busca el usuario por email — si no existe devuelve `404`
+3. Hashea la nueva contraseña con `bcrypt.hash()`
+4. Actualiza la contraseña y pone `refreshToken: null` (invalida sesiones activas)
+5. Devuelve `200 { message: 'Password updated. You can now log in.' }`
+
+#### `resetPassword`
+
+Flujo de recuperación por token (diseñado para usarse con email):
+
+1. Valida el body con `resetPasswordSchema.parse()` (token + nueva contraseña)
+2. Busca el usuario cuyo `resetToken` coincida **y** `resetTokenExpiry > now()`
+3. Si no existe o el token expiró → `400`
+4. Hashea la nueva contraseña
+5. Actualiza la contraseña y limpia `resetToken`, `resetTokenExpiry` y `refreshToken`
+
 ---
 
 ### 6.9 Controlador de Tareas (`src/controllers/taskController.js`)
@@ -472,7 +542,7 @@ Todos los controllers envían sus errores vía `next(err)` en lugar de responder
 const { status, priority, search, page = '1', limit = '10' } = req.query;
 const where = { userId: req.user.id };  // Solo tareas del usuario autenticado
 
-if (status)  where.status = status;
+if (status)   where.status = status;
 if (priority) where.priority = priority;
 if (search) {
   where.OR = [
@@ -520,10 +590,12 @@ Requiere `authenticate` + `requireRole('ADMIN')` en todas sus rutas.
 
 #### `src/routes/authRoutes.js`
 ```
-POST /register    → register
-POST /login       → login
-POST /refresh     → refresh
-POST /logout      → logout
+POST /register         → register
+POST /login            → login
+POST /refresh          → refresh
+POST /logout           → logout
+POST /forgot-password  → forgotPassword
+POST /reset-password   → resetPassword
 ```
 
 #### `src/routes/taskRoutes.js`
@@ -626,7 +698,7 @@ Define el estado de autenticación y los **async thunks**:
 | `updateTask({ id, data })` | PUT /tasks/:id |
 | `deleteTask(id)` | DELETE /tasks/:id |
 
-**Actualizaciones optimistas del estado:**
+**Actualizaciones del estado:**
 - `createTask.fulfilled` → agrega la nueva tarea al inicio del array con `unshift`
 - `updateTask.fulfilled` → reemplaza la tarea por índice
 - `deleteTask.fulfilled` → filtra la tarea del array y decrementa `total`
@@ -639,7 +711,7 @@ Define el estado de autenticación y los **async thunks**:
 export default function PrivateRoute({ requiredRole }) {
   const { user, accessToken } = useSelector((state) => state.auth);
 
-  if (!accessToken)                            return <Navigate to="/login" />;
+  if (!accessToken)                                return <Navigate to="/login" />;
   if (requiredRole && user?.role !== requiredRole) return <Navigate to="/dashboard" />;
   return <Outlet />;
 }
@@ -672,6 +744,20 @@ Panel exclusivo para administradores:
 - Lista de todos los usuarios del sistema
 - Al seleccionar un usuario, muestra sus tareas
 - Botón para cambiar el rol entre USER/ADMIN
+
+#### `ForgotPasswordPage.jsx`
+Formulario de recuperación directa de contraseña:
+- Campos: email, nueva contraseña y confirmación de contraseña
+- Validación Zod: contraseñas deben coincidir, mínimo 8 caracteres
+- Llama a `POST /api/auth/forgot-password` con `{ email, password }`
+- Al éxito redirige a `/login` con mensaje de confirmación
+
+#### `ResetPasswordPage.jsx`
+Formulario de restablecimiento por token (flujo de email):
+- Lee el token de la URL
+- Campos: nueva contraseña y confirmación
+- Llama a `POST /api/auth/reset-password` con `{ token, password }`
+- Al éxito redirige a `/login`
 
 ---
 
@@ -715,9 +801,32 @@ Frontend                    Axios Interceptor           Backend
    │◄── Tareas recibidas ──────────│◄── 200 OK + tasks ─────│
 ```
 
+### Recuperación directa de contraseña
+
+```
+Usuario          Frontend              Backend               Base de Datos
+   │                │                     │                       │
+   │── Formulario ─►│                     │                       │
+   │   email +      │── POST              │                       │
+   │   nueva pass   │   /auth/            │                       │
+   │                │   forgot-password ─►│                       │
+   │                │                     │── SELECT User ────────►│
+   │                │                     │── bcrypt.hash()        │
+   │                │                     │── UPDATE password,     │
+   │                │                     │   refreshToken=null ──►│
+   │                │◄── 200 OK ──────────│                       │
+   │◄─ Login page   │                     │                       │
+```
+
 ---
 
 ## 9. API Reference
+
+### Health
+
+| Método | Ruta | Auth | Respuesta |
+|---|---|---|---|
+| GET | /health | — | `200 { status: 'ok' }` |
 
 ### Autenticación
 
@@ -727,6 +836,8 @@ Frontend                    Axios Interceptor           Backend
 | POST | /api/auth/login | — | `{email, password}` | `200 {accessToken, user}` + cookie |
 | POST | /api/auth/refresh | Cookie | — | `200 {accessToken}` |
 | POST | /api/auth/logout | Cookie | — | `200 {message}` |
+| POST | /api/auth/forgot-password | — | `{email, password}` | `200 {message}` |
+| POST | /api/auth/reset-password | — | `{token, password}` | `200 {message}` |
 
 ### Tareas
 
@@ -770,6 +881,18 @@ Frontend                    Axios Interceptor           Backend
 }
 ```
 
+#### POST /api/auth/forgot-password
+```json
+// Request
+{ "email": "usuario@ejemplo.com", "password": "NuevaPassword123" }
+
+// Response 200
+{ "message": "Password updated. You can now log in." }
+
+// Response 404 (email no encontrado)
+{ "message": "No account found with that email." }
+```
+
 #### POST /api/tasks
 ```json
 // Request (Authorization: Bearer <token>)
@@ -778,7 +901,7 @@ Frontend                    Axios Interceptor           Backend
   "description": "Agregar endpoint POST /auth/refresh",
   "status": "IN_PROGRESS",
   "priority": "HIGH",
-  "dueDate": "2026-05-01"
+  "dueDate": "2026-06-01"
 }
 
 // Response 201
@@ -787,9 +910,9 @@ Frontend                    Axios Interceptor           Backend
   "title": "Implementar refresh tokens",
   "status": "IN_PROGRESS",
   "priority": "HIGH",
-  "dueDate": "2026-05-01T00:00:00.000Z",
+  "dueDate": "2026-06-01T00:00:00.000Z",
   "userId": 1,
-  "createdAt": "2026-04-26T10:00:00.000Z"
+  "createdAt": "2026-05-18T10:00:00.000Z"
 }
 ```
 
@@ -797,7 +920,34 @@ Frontend                    Axios Interceptor           Backend
 
 ## 10. Variables de Entorno
 
-### Backend — `backend/.env`
+### Raíz del proyecto — `.env` (Docker Compose)
+
+```env
+# PostgreSQL
+POSTGRES_DB=taskmanagerdb
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=tu_password_seguro
+
+# JWT — usar strings de 64+ caracteres generados aleatoriamente
+JWT_SECRET=string_muy_largo_y_aleatorio_para_access_tokens
+JWT_REFRESH_SECRET=otro_string_completamente_distinto_para_refresh
+JWT_ACCESS_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+
+# CORS — URL exacta del frontend
+CLIENT_URL=https://tu-dominio.com
+
+# URL del backend (se inyecta en el build del frontend)
+VITE_API_URL=https://tu-dominio.com/api
+
+# Email (para recuperación de contraseña por token)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=tu@gmail.com
+EMAIL_PASS=tu_app_password_de_gmail
+```
+
+### Backend — `backend/.env` (desarrollo local)
 
 ```env
 # Base de datos
@@ -823,7 +973,7 @@ EMAIL_USER="tu@gmail.com"
 EMAIL_PASS="tu_app_password_de_gmail"
 ```
 
-### Frontend — `frontend/.env`
+### Frontend — `frontend/.env` (desarrollo local)
 
 ```env
 VITE_API_URL="http://localhost:3000/api"
@@ -837,9 +987,10 @@ VITE_API_URL="http://localhost:3000/api"
 
 ### Requisitos previos
 
-- Node.js v18 o superior (`node --version`)
-- PostgreSQL v14 o superior corriendo localmente
+- Node.js v20 o superior (`node --version`)
+- PostgreSQL v14 o superior corriendo localmente (solo sin Docker)
 - npm v9 o superior
+- Docker y Docker Compose (para despliegue en contenedores)
 
 ### Paso 1 — Clonar el repositorio
 
@@ -896,7 +1047,6 @@ npm run dev
 ### Paso 7 — Build para producción
 
 ```bash
-# Generar el bundle de producción
 cd frontend
 npm run build
 # Los archivos estáticos quedan en frontend/dist/
@@ -904,7 +1054,160 @@ npm run build
 
 ---
 
-## 12. Tests
+## 12. Docker — Contenedorización
+
+El proyecto está completamente contenedorizado con Docker Compose. Cada servicio tiene su propio `Dockerfile` optimizado para producción.
+
+### `docker-compose.yml`
+
+```yaml
+services:
+  task-db:
+    image: postgres:16-alpine
+    container_name: task-manager-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - task_internal_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  task-backend:
+    build:
+      context: ./backend
+    container_name: task-manager-backend
+    restart: unless-stopped
+    depends_on:
+      task-db:
+        condition: service_healthy   # Espera a que PostgreSQL esté listo
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@task-db:5432/${POSTGRES_DB}
+      # ... resto de variables
+    networks:
+      - proxy_network       # Expuesto al proxy externo
+      - task_internal_net   # Conectado a la BD de forma privada
+
+  task-frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL}   # Inyectada en tiempo de build
+    container_name: task-manager-frontend
+    restart: unless-stopped
+    depends_on:
+      - task-backend
+    networks:
+      - proxy_network
+
+networks:
+  proxy_network:
+    external: true          # Red compartida con Nginx Proxy Manager
+  task_internal_net:
+    driver: bridge          # Red privada exclusiva de este proyecto
+
+volumes:
+  postgres_data:
+```
+
+### Backend — `Dockerfile`
+
+```dockerfile
+FROM node:20-alpine
+
+# Dependencias del sistema que necesita Prisma en Alpine
+RUN apk add --no-cache openssl libc6-compat
+
+ENV NODE_ENV=production
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+RUN npx prisma generate \
+    && addgroup -S appgroup \
+    && adduser -S appuser -G appgroup \
+    && chown -R appuser:appgroup /app \
+    && chmod +x entrypoint.sh
+
+USER appuser
+EXPOSE 3000
+ENTRYPOINT ["./entrypoint.sh"]
+```
+
+### Backend — `entrypoint.sh`
+
+```sh
+#!/bin/sh
+set -e
+npx prisma migrate deploy   # Aplica migraciones pendientes al arrancar
+exec node server.js
+```
+
+**Por qué es importante:** Al arrancar el contenedor, las migraciones se aplican automáticamente antes de que el servidor acepte peticiones. Esto garantiza que la BD esté siempre actualizada sin intervención manual.
+
+### Frontend — `Dockerfile` (build multietapa)
+
+```dockerfile
+# Etapa 1: Compilación con Node
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --legacy-peer-deps
+COPY . .
+
+# La URL del backend se inyecta en tiempo de build para que Vite la embeba
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
+RUN npm run build
+
+# Etapa 2: Servidor Nginx mínimo para los archivos estáticos
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### Frontend — `nginx.conf`
+
+```nginx
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # SPA fallback — rutas no encontradas devuelven index.html (React Router)
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Caché agresivo para assets con hash en el nombre (generados por Vite)
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+```
+
+**Diseño de la imagen:** La imagen de producción del frontend solo contiene los archivos estáticos compilados y Nginx — sin Node.js, sin código fuente, sin `node_modules`. Tamaño mínimo, superficie de ataque mínima.
+
+---
+
+## 13. Tests
 
 Los tests usan **Jest** + **Supertest** y se encuentran en `backend/tests/`.
 
@@ -912,6 +1215,17 @@ Los tests usan **Jest** + **Supertest** y se encuentran en `backend/tests/`.
 cd backend
 npm test
 ```
+
+La configuración de Jest está en `package.json`:
+
+```json
+"jest": {
+  "testEnvironment": "node",
+  "testRegex": "tests/.*\\.test\\.js$"
+}
+```
+
+La flag `--runInBand` hace que los tests se ejecuten secuencialmente (no en paralelo), lo cual es necesario porque comparten la misma base de datos de test.
 
 ### `tests/auth.test.js` — Casos de prueba
 
@@ -938,66 +1252,96 @@ npm test
 
 ---
 
-## 13. Deploy con Nginx
+## 14. Deploy con Docker y Nginx Proxy Manager
 
-### Configuración Nginx (`/etc/nginx/sites-available/task-manager-jwt`)
+### Arquitectura de red en producción
 
-```nginx
-server {
-    listen 80;
-    server_name 192.168.233.10;
-
-    # Servir el build de React (Vite)
-    root /home/emarin/projects/task-manager-jwt/frontend/dist;
-    index index.html;
-
-    # React Router: todas las rutas no encontradas → index.html (SPA fallback)
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Proxy al backend Express en puerto 3000
-    location /api/ {
-        proxy_pass         http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header   Host       $host;
-        proxy_set_header   X-Real-IP  $remote_addr;
-    }
-}
+```
+Internet
+    │
+Nginx Proxy Manager
+(red: proxy_network — externa)
+    ├── task-frontend :80     (Nginx Alpine + build estático)
+    └── task-backend  :3000   (Node 20 Alpine)
+              │
+      task_internal_net (bridge privada)
+              │
+      task-db :5432 (PostgreSQL 16 — no expuesta)
 ```
 
-### Activar el sitio
+La BD nunca está en la red `proxy_network`, solo en la red interna privada. Solo el backend puede hablar con ella.
+
+### Paso 1 — Crear la red externa (solo una vez)
 
 ```bash
-# Crear symlink para activar el sitio
-sudo ln -s /etc/nginx/sites-available/task-manager-jwt \
-           /etc/nginx/sites-enabled/task-manager-jwt
-
-# Verificar configuración
-sudo nginx -t
-
-# Recargar Nginx
-sudo systemctl reload nginx
+docker network create proxy_network
 ```
 
-### Deploy del backend con PM2
+### Paso 2 — Configurar las variables de entorno
 
 ```bash
-# Instalar PM2 globalmente
-npm install -g pm2
+cp .env.example .env
+# Editar con:
+# - POSTGRES_PASSWORD fuerte
+# - JWT_SECRET y JWT_REFRESH_SECRET de 64+ caracteres
+# - CLIENT_URL y VITE_API_URL con el dominio real
+```
 
-# Iniciar el backend en producción
-cd /home/emarin/projects/task-manager-jwt/backend
-NODE_ENV=production pm2 start server.js --name task-manager-api
+### Paso 3 — Construir e iniciar los servicios
 
-# Arrancar PM2 al iniciar el sistema
-pm2 startup
-pm2 save
+```bash
+docker compose up -d --build
+```
+
+El backend esperará a que PostgreSQL pase su healthcheck antes de arrancar. Luego ejecutará `prisma migrate deploy` automáticamente.
+
+### Paso 4 — Verificar que los servicios están corriendo
+
+```bash
+docker compose ps
+docker compose logs -f task-backend
+```
+
+### Paso 5 — Configurar Nginx Proxy Manager
+
+Crear entradas de Proxy Host para que el tráfico llegue a los contenedores:
+
+| Dominio | Destino | Puerto |
+|---|---|---|
+| `tu-dominio.com` | `task-frontend` | `80` |
+| `api.tu-dominio.com` | `task-backend` | `3000` |
+
+O usar un único dominio con path-based routing:
+- `/api/` → `task-backend:3000`
+- `/` → `task-frontend:80`
+
+Activar SSL con Let's Encrypt en cada entrada (checkbox "Request a new SSL Certificate").
+
+### Actualización del servidor
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+Las migraciones de BD se aplican automáticamente al reiniciar el backend.
+
+### Gestión del volumen de datos
+
+```bash
+# Ver logs
+docker compose logs -f
+
+# Parar sin borrar datos
+docker compose down
+
+# Parar y borrar todos los datos de la BD
+docker compose down -v
 ```
 
 ---
 
-## 14. Seguridad
+## 15. Seguridad
 
 ### Medidas implementadas
 
@@ -1008,18 +1352,22 @@ pm2 save
 | Refresh token HTTP-Only | Cookie inaccesible desde JS | XSS |
 | SameSite: Strict | Cookie no enviada en requests cross-site | CSRF |
 | Rate limiting | 20 requests / 15 min en `/api/auth` | Fuerza bruta / credential stuffing |
-| Helmet | Headers HTTP seguros | Ataques de inyección de headers, clickjacking |
+| Helmet | Headers HTTP seguros | Inyección de headers, clickjacking |
 | Validación Zod | En backend antes de cada operación | Datos malformados, inyección |
 | CORS restringido | Solo acepta el `CLIENT_URL` configurado | Requests de orígenes no autorizados |
 | Autorización por recurso | Verifica `userId` antes de editar/borrar | Escalación horizontal de privilegios |
 | Doble verificación del refresh token | Compara con el token almacenado en BD | Reuso de tokens tras logout |
+| Trust proxy | `app.set('trust proxy', 1)` | Rate limit correcto detrás de Nginx |
+| Usuario sin privilegios en Docker | Corre como `appuser` (no root) | Escalación de privilegios en el contenedor |
+| BD no expuesta en red pública | Solo en `task_internal_net` | Acceso directo a la base de datos |
+| Build multietapa (frontend) | Imagen final sin Node.js ni código fuente | Exposición del código fuente |
 
 ### Importante en producción
 
-1. Cambiar `NODE_ENV=production` → activa `secure: true` en la cookie del refresh token (solo HTTPS)
-2. Usar HTTPS — el `secure: true` en la cookie requiere TLS
+1. `NODE_ENV=production` está forzado en `docker-compose.yml` → activa `secure: true` en la cookie del refresh token (solo HTTPS)
+2. Usar HTTPS — el `secure: true` en la cookie lo requiere. Nginx Proxy Manager lo gestiona automáticamente con Let's Encrypt
 3. Cambiar los secretos JWT por strings de 64+ caracteres generados aleatoriamente
-4. Configurar `DATABASE_URL` apuntando a la instancia de BD en la nube
+4. Configurar `DATABASE_URL` apuntando al contenedor `task-db` (ya configurado en `docker-compose.yml`)
 
 ---
 
@@ -1027,4 +1375,4 @@ pm2 save
 
 **Euclides Marín**
 
-Proyecto de práctica — Stack PERN con autenticación JWT completa.
+Proyecto de práctica — Stack PERN con autenticación JWT completa y despliegue Docker.
