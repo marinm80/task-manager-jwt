@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "portfolio-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "C:/Users/marin/OneDrive/Documents/Workspace/projects/technical-portfolio/frontend", "--", "--port", "5199", "--strictPort"],
+      "port": 5199
+    }
+  ]
+}
