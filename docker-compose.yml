@@ -2,8 +2,6 @@ services:
   # 1. BASE DE DATOS (PostgreSQL)
   task-db:
     image: postgres:16-alpine
-    ports:
-      - "5432:5432"
     container_name: task-manager-db
     restart: unless-stopped
     environment:
