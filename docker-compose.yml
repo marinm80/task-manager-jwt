@@ -44,7 +44,7 @@ services:
       EMAIL_USER: ${EMAIL_USER}
       EMAIL_PASS: ${EMAIL_PASS}
     networks:
-      - proxy_network       # Red para que Nginx Proxy Manager lo localice
+      - coolify       # Red para que Nginx Proxy Manager lo localice
       - task_internal_net   # Red privada para hablar con la base de datos
 
   # 3. FRONTEND (React + Vite)
@@ -58,10 +58,10 @@ services:
     depends_on:
       - task-backend
     networks:
-      - proxy_network       # Red para que Nginx Proxy Manager lo localice
+      - coolify       # Red para que Nginx Proxy Manager lo localice
 
 networks:
-  proxy_network:
+  coolify:
     external: true          # Conecta con tu Nginx global de AWS
   task_internal_net:
     driver: bridge          # Red privada exclusiva para este proyecto

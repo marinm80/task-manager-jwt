@@ -547,7 +547,7 @@ El despliegue en producción usa Docker Compose con tres contenedores y una red 
 ```
 Internet
     │
-Nginx Proxy Manager (red: proxy_network)
+Nginx Proxy Manager (red: coolify)
     ├── task-frontend  (puerto 80 interno)
     └── task-backend   (puerto 3000 interno)
              │
@@ -561,7 +561,7 @@ Nginx Proxy Manager (red: proxy_network)
 **1. Crear la red externa** (solo la primera vez)
 
 ```bash
-docker network create proxy_network
+docker network create coolify
 ```
 
 **2. Copiar y editar variables de entorno**

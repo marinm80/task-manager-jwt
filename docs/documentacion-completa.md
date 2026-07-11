@@ -99,7 +99,7 @@ Task Manager JWT es una aplicación web fullstack que permite a los usuarios ges
 ```
 Internet
     │
-Nginx Proxy Manager  (red: proxy_network)
+Nginx Proxy Manager  (red: coolify)
     ├── task-frontend  :80  (Nginx Alpine + build Vite)
     └── task-backend   :3000  (Node 20 Alpine)
                 │
@@ -1092,7 +1092,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@task-db:5432/${POSTGRES_DB}
       # ... resto de variables
     networks:
-      - proxy_network       # Expuesto al proxy externo
+      - coolify       # Expuesto al proxy externo
       - task_internal_net   # Conectado a la BD de forma privada
 
   task-frontend:
@@ -1105,10 +1105,10 @@ services:
     depends_on:
       - task-backend
     networks:
-      - proxy_network
+      - coolify
 
 networks:
-  proxy_network:
+  coolify:
     external: true          # Red compartida con Nginx Proxy Manager
   task_internal_net:
     driver: bridge          # Red privada exclusiva de este proyecto
@@ -1260,7 +1260,7 @@ La flag `--runInBand` hace que los tests se ejecuten secuencialmente (no en para
 Internet
     │
 Nginx Proxy Manager
-(red: proxy_network — externa)
+(red: coolify — externa)
     ├── task-frontend :80     (Nginx Alpine + build estático)
     └── task-backend  :3000   (Node 20 Alpine)
               │
@@ -1269,12 +1269,12 @@ Nginx Proxy Manager
       task-db :5432 (PostgreSQL 16 — no expuesta)
 ```
 
-La BD nunca está en la red `proxy_network`, solo en la red interna privada. Solo el backend puede hablar con ella.
+La BD nunca está en la red `coolify`, solo en la red interna privada. Solo el backend puede hablar con ella.
 
 ### Paso 1 — Crear la red externa (solo una vez)
 
 ```bash
-docker network create proxy_network
+docker network create coolify
 ```
 
 ### Paso 2 — Configurar las variables de entorno

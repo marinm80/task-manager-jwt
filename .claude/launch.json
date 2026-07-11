@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "banner-studio",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "C:/Users/marin/OneDrive/Documents/Workspace/projects/banners"],
+      "port": 5299
+    },
+    {
       "name": "portfolio-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "C:/Users/marin/OneDrive/Documents/Workspace/projects/technical-portfolio/frontend", "--", "--port", "5199", "--strictPort"],
