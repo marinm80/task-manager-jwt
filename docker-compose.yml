@@ -28,8 +28,13 @@ services:
       task-db:
         condition: service_healthy
     environment:
-      # Apunta a 'task-db' de forma interna y automática
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@task-db:5432/${POSTGRES_DB}
+      # DATABASE_URL se construye en entrypoint.sh con encodeURIComponent
+      # para que caracteres especiales en la password no rompan la URL.
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: task-db
+      POSTGRES_PORT: 5432
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
