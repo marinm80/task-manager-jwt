@@ -113,9 +113,6 @@ Base de datos (PostgreSQL)
 
 ```
 task-manager-jwt/
-├── docker-compose.yml             # Orquestación de contenedores
-├── .env                           # Variables de entorno para Docker
-│
 ├── backend/
 │   ├── Dockerfile                 # Imagen Node 20 Alpine (producción)
 │   ├── entrypoint.sh              # Corre migraciones y arranca el servidor
@@ -186,7 +183,7 @@ task-manager-jwt/
 ## Requisitos previos
 
 - [Node.js](https://nodejs.org/) v20 o superior
-- [Docker](https://www.docker.com/) y Docker Compose (para despliegue en contenedores)
+- [Docker](https://www.docker.com/) (para construir las imágenes de `backend/Dockerfile` y `frontend/Dockerfile`)
 - [PostgreSQL](https://www.postgresql.org/) v14 o superior (solo para desarrollo local sin Docker)
 - npm v9 o superior
 
@@ -243,53 +240,39 @@ npm run dev
 
 ---
 
-## Instalación con Docker
+## Probar los Dockerfiles en local
 
-El proyecto incluye un `docker-compose.yml` que levanta tres contenedores: base de datos, backend y frontend.
-
-### 1. Crear el archivo de variables de entorno
+El backend y el frontend son imágenes independientes (sin docker-compose). Para probarlas localmente:
 
 ```bash
-cp .env.example .env
-# Editar .env con los valores reales
+# Backend — necesita una Postgres accesible (local o remota)
+docker build -t task-backend ./backend
+docker run --rm -p 3000:3000 \
+  -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=tu_password \
+  -e POSTGRES_DB=taskmanagerdb -e POSTGRES_HOST=host.docker.internal -e POSTGRES_PORT=5432 \
+  -e JWT_SECRET=dev -e JWT_REFRESH_SECRET=dev2 -e CLIENT_URL=http://localhost:5173 \
+  task-backend
+
+# Frontend
+docker build -t task-frontend --build-arg VITE_API_URL=http://localhost:3000/api ./frontend
+docker run --rm -p 8080:80 task-frontend
 ```
 
-### 2. Levantar todos los servicios
-
-```bash
-docker compose up -d --build
-```
-
-Esto levanta:
-- **task-db** — PostgreSQL 16, datos persistidos en volumen `postgres_data`
-- **task-backend** — API Express, espera a que la BD esté sana antes de arrancar
-- **task-frontend** — Build de React servido por Nginx en el contenedor
-
-### 3. Ver los logs
-
-```bash
-docker compose logs -f task-backend
-```
-
-### 4. Parar los servicios
-
-```bash
-docker compose down
-# Para borrar también los datos de la BD:
-docker compose down -v
-```
+`entrypoint.sh` construye `DATABASE_URL` a partir de esas variables `POSTGRES_*` (con `encodeURIComponent`, así que la password puede tener cualquier caracter especial) y corre `prisma migrate deploy` antes de arrancar el server.
 
 ---
 
 ## Variables de entorno
 
-### Raíz del proyecto — `.env` (para Docker Compose)
+### Backend en producción (Coolify — runtime env vars de la app)
 
 ```env
-# PostgreSQL
-POSTGRES_DB=taskmanagerdb
-POSTGRES_USER=postgres
+# Postgres — entrypoint.sh construye DATABASE_URL con estas 5 (con URL-encoding seguro)
+POSTGRES_USER=taskmanager
 POSTGRES_PASSWORD=tu_password_seguro
+POSTGRES_DB=taskmanagerdb
+POSTGRES_HOST=<host interno de la base en Coolify>
+POSTGRES_PORT=5432
 
 # JWT — strings largos y aleatorios (64+ caracteres)
 JWT_SECRET=string_muy_largo_y_aleatorio_para_access_tokens
@@ -298,16 +281,21 @@ JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 
 # CORS — URL exacta del frontend
-CLIENT_URL=https://tu-dominio.com
+CLIENT_URL=https://tu-dominio-frontend.com
 
-# URL del backend (para el build del frontend)
-VITE_API_URL=https://tu-dominio.com/api
+NODE_ENV=production
 
 # Email (para recuperación de contraseña con token)
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=tu@gmail.com
 EMAIL_PASS=tu_app_password_de_gmail
+```
+
+### Frontend en producción (Coolify — build arg de la app)
+
+```env
+VITE_API_URL=https://tu-dominio-backend.com/api
 ```
 
 ### Backend — `backend/.env.example` (desarrollo local)
@@ -538,65 +526,41 @@ npm test
 
 ---
 
-## Deploy con Docker y Nginx Proxy Manager
+## Deploy en Coolify (recursos independientes)
 
-El despliegue en producción usa Docker Compose con tres contenedores y una red externa gestionada por Nginx Proxy Manager.
-
-### Arquitectura de red
+El proyecto ya no usa docker-compose. Cada pieza es un recurso independiente en Coolify, dentro del mismo proyecto/environment:
 
 ```
 Internet
     │
-Nginx Proxy Manager (red: coolify)
-    ├── task-frontend  (puerto 80 interno)
-    └── task-backend   (puerto 3000 interno)
+    ├── task-frontend  (app Dockerfile, dominio propio, puerto 80)
+    │       usa VITE_API_URL → task-backend, horneado en build time
+    │
+    └── task-backend   (app Dockerfile, dominio propio, puerto 3000)
              │
-         task_internal_net (red privada)
-             │
-         task-db (PostgreSQL, no expuesto)
+         task-manager-postgres (Database Postgres administrada por Coolify, no pública)
 ```
+
+El frontend es un SPA estático (Nginx) que llama al backend directo desde el browser vía HTTPS — no hay red compartida ni proxy interno entre los tres recursos.
 
 ### Pasos de deploy
 
-**1. Crear la red externa** (solo la primera vez)
+**1. Crear la base de datos** — `+ New → Database → PostgreSQL` en el proyecto, marcada como no pública.
 
-```bash
-docker network create coolify
-```
+**2. Crear la app del backend** — `+ New → Application → Dockerfile`, apuntando a `backend/Dockerfile`, puerto expuesto `3000`. Variables de entorno: ver sección anterior (`POSTGRES_*`, `JWT_*`, `CLIENT_URL`, `EMAIL_*`, `NODE_ENV=production`).
 
-**2. Copiar y editar variables de entorno**
+**3. Crear la app del frontend** — `+ New → Application → Dockerfile`, apuntando a `frontend/Dockerfile`, puerto expuesto `80`. Build arg `VITE_API_URL` con el dominio que Coolify asignó al backend.
 
-```bash
-cp .env.example .env
-# Configurar con valores de producción (secretos, dominio, DB password)
-```
+**4. Volver al backend** y setear `CLIENT_URL` con el dominio que Coolify asignó al frontend, luego redeploy.
 
-**3. Construir e iniciar los contenedores**
-
-```bash
-docker compose up -d --build
-```
-
-**4. Configurar Nginx Proxy Manager**
-
-Crear dos entradas de Proxy Host:
-- `api.tu-dominio.com` → `task-backend:3000`
-- `tu-dominio.com` → `task-frontend:80`
-
-O configurar un único dominio con rutas:
-- `/api/` → `task-backend:3000`
-- `/` → `task-frontend:80`
-
-**5. Habilitar SSL en Nginx Proxy Manager**
-
-En cada Proxy Host, activar "Request a new SSL Certificate" con Let's Encrypt.
+**5. SSL** — Coolify emite el certificado Let's Encrypt automáticamente por dominio.
 
 ### Notas importantes en producción
 
-- `NODE_ENV=production` ya está forzado en el `docker-compose.yml` → activa `secure: true` en la cookie del refresh token (requiere HTTPS)
-- El backend corre `prisma migrate deploy` automáticamente al arrancar (via `entrypoint.sh`)
-- Los datos de PostgreSQL persisten en el volumen `postgres_data`
-- Para actualizar: `docker compose pull && docker compose up -d --build`
+- `NODE_ENV=production` activa `secure: true` en la cookie del refresh token (requiere HTTPS)
+- El backend corre `prisma migrate deploy` automáticamente al arrancar (via `entrypoint.sh`), que también construye `DATABASE_URL` con `encodeURIComponent` sobre `POSTGRES_USER`/`POSTGRES_PASSWORD` — cualquier caracter especial en la password es seguro
+- Los datos de Postgres los administra el recurso Database de Coolify (backups/volumen fuera del control de la app)
+- Para actualizar: push a `main` dispara el redeploy si el webhook está activo, o redeploy manual desde Coolify
 
 ---
 
