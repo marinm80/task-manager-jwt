@@ -1,29 +1,42 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
-import { fetchTasks } from '../features/tasks/tasksSlice';
-import { logoutUser } from '../features/auth/authSlice';
-import TaskCard from '../components/TaskCard';
+import { fetchTasks, fetchTaskStats } from '../features/tasks/tasksSlice';
+import { computeTaskStats } from '../features/tasks/taskStats';
+import DashboardLayout from '../components/layout/DashboardLayout';
+import DashboardHeader from '../components/dashboard/DashboardHeader';
+import MetricCard from '../components/dashboard/MetricCard';
+import TaskFilters from '../components/dashboard/TaskFilters';
+import TaskList from '../components/dashboard/TaskList';
 import TaskForm from '../components/TaskForm';
+import EmptyState from '../components/ui/EmptyState';
 import api from '../utils/axiosConfig';
 
+// Restyle de integración (T-039): conserva `fetchTasks`/`handleExport` ya
+// existentes (RF-16/RF-22); `logoutUser` sigue disparándose de extremo a
+// extremo, ahora desde `DashboardLayout` (T-018), que ya tenía acceso
+// directo a Redux para las dos páginas que lo consumen (RF-24). Delega
+// presentación a `DashboardLayout` + `DashboardHeader` (T-031) + fila de
+// `MetricCard` (T-032, alimentada por `computeTaskStats(statsSnapshot.items)`,
+// T-033) + `TaskFilters` (T-035) + `TaskList` (T-036) + `TaskForm` (T-038).
 export default function DashboardPage() {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const { items, total, loading } = useSelector((s) => s.tasks);
-  const { user } = useSelector((s) => s.auth);
+  const { items, total, loading, statsSnapshot } = useSelector((state) => state.tasks);
+  const { user } = useSelector((state) => state.auth);
   const [showForm, setShowForm] = useState(false);
   const [editTask, setEditTask] = useState(null);
+  const [view, setView] = useState('list');
   const [filters, setFilters] = useState({ search: '', status: '', priority: '', page: 1, limit: 12 });
 
   useEffect(() => {
     dispatch(fetchTasks(filters));
   }, [dispatch, filters]);
 
-  const handleLogout = async () => {
-    await dispatch(logoutUser());
-    navigate('/login');
-  };
+  // D-03: el snapshot de métricas se pide una sola vez al montar la página;
+  // las mutaciones (createTask/updateTask/deleteTask) lo mantienen
+  // sincronizado por parcheo optimista en `tasksSlice`, sin refetch aquí.
+  useEffect(() => {
+    dispatch(fetchTaskStats());
+  }, [dispatch]);
 
   const handleExport = async () => {
     const res = await api.get('/tasks/export', { responseType: 'blob' });
@@ -35,83 +48,55 @@ export default function DashboardPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleFilterChange = (patch) => {
+    setFilters((prev) => ({ ...prev, ...patch, page: 1 }));
+  };
+
+  const openCreate = () => { setEditTask(null); setShowForm(true); };
   const openEdit = (task) => { setEditTask(task); setShowForm(true); };
   const closeForm = () => { setShowForm(false); setEditTask(null); };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-900">Task Manager</h1>
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-gray-500 hidden sm:block">Hello, {user?.name}</span>
-          {user?.role === 'ADMIN' && (
-            <Link to="/admin" className="text-purple-600 hover:underline font-medium">Admin</Link>
-          )}
-          <button onClick={handleLogout} className="text-red-500 hover:underline">Logout</button>
-        </div>
-      </header>
+  const stats = computeTaskStats(statsSnapshot.items);
 
-      <main className="max-w-5xl mx-auto py-8 px-4 space-y-6">
-        <div className="flex flex-wrap gap-2 items-center">
-          <input
-            placeholder="Search tasks…"
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value, page: 1 })}
-            className="border rounded px-3 py-1.5 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <select
-            value={filters.status}
-            onChange={(e) => setFilters({ ...filters, status: e.target.value, page: 1 })}
-            className="border rounded px-3 py-1.5 text-sm"
-          >
-            <option value="">All statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="COMPLETED">Completed</option>
-          </select>
-          <select
-            value={filters.priority}
-            onChange={(e) => setFilters({ ...filters, priority: e.target.value, page: 1 })}
-            className="border rounded px-3 py-1.5 text-sm"
-          >
-            <option value="">All priorities</option>
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-          </select>
-          <div className="ml-auto flex gap-2">
-            <button onClick={handleExport} className="text-sm border px-3 py-1.5 rounded hover:bg-gray-50 text-gray-600">
-              Export CSV
-            </button>
-            <button onClick={() => setShowForm(true)} className="bg-blue-600 text-white text-sm px-4 py-1.5 rounded hover:bg-blue-700 font-medium">
-              + New Task
-            </button>
-          </div>
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        <DashboardHeader userName={user?.name} onNewTaskClick={openCreate} />
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricCard label="Total de tareas" value={stats.total} tone="neutral" />
+          <MetricCard label="Por hacer" value={stats.byStatus.PENDING} tone="purple" />
+          <MetricCard label="En curso" value={stats.byStatus.IN_PROGRESS} tone="amber" />
+          <MetricCard label="Listas" value={stats.byStatus.COMPLETED} tone="green" />
         </div>
+
+        <TaskFilters
+          filters={{ search: filters.search, status: filters.status, priority: filters.priority }}
+          view={view}
+          onFilterChange={handleFilterChange}
+          onViewChange={setView}
+          onExport={handleExport}
+        />
 
         {loading ? (
-          <p className="text-center text-gray-400 py-16">Loading…</p>
+          <p className="py-16 text-center text-sm text-muted">Cargando tareas…</p>
         ) : items.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-gray-400 text-lg">No tasks found.</p>
-            <button onClick={() => setShowForm(true)} className="mt-3 text-blue-600 hover:underline text-sm">
-              Create your first task →
-            </button>
-          </div>
+          <EmptyState
+            title="Todavía no hay tareas"
+            description="Crea tu primera tarea para empezar a organizar tu trabajo con Taskly."
+            actionLabel="Crear mi primera tarea"
+            onAction={openCreate}
+          />
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((task) => (
-              <TaskCard key={task.id} task={task} onEdit={openEdit} />
-            ))}
-          </div>
+          <TaskList tasks={items} view={view} loading={loading} onEdit={openEdit} />
         )}
 
         {total > 0 && (
-          <p className="text-center text-xs text-gray-400">{total} task{total !== 1 ? 's' : ''} total</p>
+          <p className="text-center text-xs text-muted">{total} tarea{total !== 1 ? 's' : ''} en total</p>
         )}
-      </main>
+      </div>
 
       {showForm && <TaskForm task={editTask} onClose={closeForm} />}
-    </div>
+    </DashboardLayout>
   );
 }

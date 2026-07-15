@@ -4,6 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../utils/axiosConfig';
+import AuthLayout from '../components/layout/AuthLayout';
+import Button from '../components/ui/Button';
 
 const schema = z.object({
   password: z.string().min(8, 'At least 8 characters'),
@@ -12,6 +14,14 @@ const schema = z.object({
   message: 'Passwords do not match',
   path: ['confirmPassword'],
 });
+
+// T-030: restyle de presentación únicamente — el servicio invocado
+// (`api.post('/auth/reset-password', ...)`), su payload y la validación
+// zod no cambian (RF-10); tras éxito sigue redirigiendo a "/login" con el
+// mismo mensaje de éxito.
+const INPUT_CLASSES =
+  'h-12 w-full rounded-btn border border-line bg-surface px-3 text-sm text-ink ' +
+  'placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-green';
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -33,51 +43,57 @@ export default function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-lg shadow w-full max-w-sm text-center">
-          <p className="text-red-500 text-sm mb-4">Invalid reset link.</p>
-          <Link to="/login" className="text-blue-600 hover:underline text-sm">Back to login</Link>
-        </div>
-      </div>
+      <AuthLayout title="Reset password">
+        <p role="alert" className="mb-4 rounded-btn border border-coral/30 bg-coral/10 px-3 py-2 text-sm text-coral-dark">
+          Invalid reset link.
+        </p>
+        <Link to="/login" className="text-sm text-green hover:underline">
+          Back to login
+        </Link>
+      </AuthLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-lg shadow w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-center mb-2">Reset password</h1>
-        <p className="text-center text-gray-500 text-sm mb-6">Enter your new password.</p>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <input
-              {...register('password')}
-              placeholder="New password"
-              type="password"
-              autoComplete="new-password"
-              className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
-          </div>
-          <div>
-            <input
-              {...register('confirmPassword')}
-              placeholder="Confirm new password"
-              type="password"
-              autoComplete="new-password"
-              className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword.message}</p>}
-          </div>
-          {serverError && <p className="text-red-500 text-sm text-center">{serverError}</p>}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
-          >
-            {isSubmitting ? 'Updating…' : 'Update password'}
-          </button>
-        </form>
-      </div>
-    </div>
+    <AuthLayout title="Reset password" subtitle="Enter your new password.">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <div>
+          <label htmlFor="reset-password" className="mb-1 block text-sm font-medium text-ink">
+            New password
+          </label>
+          <input
+            {...register('password')}
+            id="reset-password"
+            type="password"
+            autoComplete="new-password"
+            className={INPUT_CLASSES}
+          />
+          {errors.password && <p className="mt-1 text-xs text-coral-dark">{errors.password.message}</p>}
+        </div>
+        <div>
+          <label htmlFor="reset-confirm-password" className="mb-1 block text-sm font-medium text-ink">
+            Confirm new password
+          </label>
+          <input
+            {...register('confirmPassword')}
+            id="reset-confirm-password"
+            type="password"
+            autoComplete="new-password"
+            className={INPUT_CLASSES}
+          />
+          {errors.confirmPassword && (
+            <p className="mt-1 text-xs text-coral-dark">{errors.confirmPassword.message}</p>
+          )}
+        </div>
+        {serverError && (
+          <p role="alert" className="rounded-btn border border-coral/30 bg-coral/10 px-3 py-2 text-sm text-coral-dark">
+            {serverError}
+          </p>
+        )}
+        <Button type="submit" isLoading={isSubmitting} className="w-full">
+          {isSubmitting ? 'Updating…' : 'Update password'}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }
