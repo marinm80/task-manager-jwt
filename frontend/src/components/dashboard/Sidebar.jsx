@@ -59,7 +59,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
       {/* Sidebar persistente de escritorio */}
       <aside
         aria-label="Barra lateral"
-        className="hidden h-screen w-[228px] flex-shrink-0 flex-col gap-8 border-r border-line bg-surface p-4 md:flex"
+        className="hidden h-screen w-sidebar flex-shrink-0 flex-col gap-8 border-r border-line bg-surface p-4 md:flex"
       >
         <Link to="/">
           <Logo />
@@ -78,7 +78,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
             aria-modal="true"
             aria-label="Menú de navegación"
             tabIndex={-1}
-            className="motion-safe:animate-fade-in-up fixed inset-y-0 left-0 flex w-[228px] flex-col gap-8 bg-surface p-4 shadow-md"
+            className="motion-safe:animate-fade-in-up fixed inset-y-0 left-0 flex w-sidebar flex-col gap-8 bg-surface p-4 shadow-md"
           >
             <div className="flex items-center justify-between">
               <Link to="/">

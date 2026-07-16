@@ -13,7 +13,7 @@ export default function Hero({ onSecondaryCtaClick }) {
     <section className="bg-paper">
       <div className="mx-auto flex max-w-content flex-col items-center gap-6 px-4 py-20 text-center md:px-6 md:py-28">
         <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-1.5 text-xs font-semibold text-ink">
-          <span className="rounded-full bg-green px-2 py-0.5 text-[10px] uppercase text-white">
+          <span className="rounded-full bg-green px-2 py-0.5 text-eyebrow uppercase text-white">
             {heroContent.eyebrow}
           </span>
           {heroContent.eyebrowHighlight}

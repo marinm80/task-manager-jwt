@@ -40,7 +40,7 @@ export default function DashboardLayout({ children }) {
       <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
 
       <div className="flex min-h-screen flex-1 flex-col">
-        <header className="flex h-[67px] items-center gap-3 border-b border-line bg-surface px-4 md:px-6">
+        <header className="flex h-dashboard-header items-center gap-3 border-b border-line bg-surface px-4 md:px-6">
           <Button
             variant="ghost"
             size="sm"

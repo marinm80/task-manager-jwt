@@ -35,6 +35,13 @@ export default {
         content: '1180px',
         dashboard: '1420px',
       },
+      width: {
+        sidebar: '228px',
+      },
+      height: {
+        'public-header': '78px',
+        'dashboard-header': '67px',
+      },
       keyframes: {
         fadeInUp: {
           '0%': { opacity: '0', transform: 'translateY(15px)' },

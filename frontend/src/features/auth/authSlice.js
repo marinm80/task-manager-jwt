@@ -1,5 +1,17 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../../utils/axiosConfig';
+import { refreshSession } from '../../services/sessionService';
+
+export const bootstrapSession = createAsyncThunk(
+  'auth/bootstrapSession',
+  async () => refreshSession(),
+  {
+    condition: (_, { getState }) => {
+      const { initialized, initializing } = getState().auth;
+      return !initialized && !initializing;
+    },
+  }
+);
 
 export const loginUser = createAsyncThunk('auth/login', async (credentials, { rejectWithValue }) => {
   try {
@@ -29,10 +41,23 @@ export const logoutUser = createAsyncThunk('auth/logoutUser', async (_, { dispat
 
 const authSlice = createSlice({
   name: 'auth',
-  initialState: { user: null, accessToken: null, loading: false, error: null },
+  initialState: {
+    user: null,
+    accessToken: null,
+    loading: false,
+    error: null,
+    initialized: false,
+    initializing: false,
+  },
   reducers: {
     setAccessToken: (state, action) => { state.accessToken = action.payload; },
-    logout: (state) => { state.user = null; state.accessToken = null; state.error = null; },
+    logout: (state) => {
+      state.user = null;
+      state.accessToken = null;
+      state.error = null;
+      state.initialized = true;
+      state.initializing = false;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -41,6 +66,7 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user;
         state.accessToken = action.payload.accessToken;
+        state.initialized = true;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
@@ -51,6 +77,21 @@ const authSlice = createSlice({
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+      .addCase(bootstrapSession.pending, (state) => {
+        state.initializing = true;
+      })
+      .addCase(bootstrapSession.fulfilled, (state, action) => {
+        state.user = action.payload.user;
+        state.accessToken = action.payload.accessToken;
+        state.initializing = false;
+        state.initialized = true;
+      })
+      .addCase(bootstrapSession.rejected, (state) => {
+        state.user = null;
+        state.accessToken = null;
+        state.initializing = false;
+        state.initialized = true;
       });
   },
 });

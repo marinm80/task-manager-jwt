@@ -18,7 +18,7 @@ const NAV_LINKS = [
 export default function PublicHeader() {
   return (
     <header className="border-b border-line bg-surface">
-      <div className="mx-auto flex h-[78px] max-w-content items-center justify-between px-4 md:px-6">
+      <div className="mx-auto flex h-public-header max-w-content items-center justify-between px-4 md:px-6">
         <Link to="/">
           <Logo />
         </Link>

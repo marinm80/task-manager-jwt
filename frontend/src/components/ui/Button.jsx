@@ -5,7 +5,7 @@ import { forwardRef } from 'react';
 // movimiento reducido; `motion-reduce:` la anula explícitamente (RF-41).
 const MOTION_CLASSES =
   'transition-transform duration-200 ease-out ' +
-  'motion-safe:hover:-translate-y-[2px] motion-safe:hover:shadow-md ' +
+  'motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-md ' +
   'motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none';
 
 const FOCUS_CLASSES =

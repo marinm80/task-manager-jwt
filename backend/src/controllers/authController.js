@@ -53,7 +53,10 @@ const refresh = async (req, res, next) => {
     if (!user || user.refreshToken !== token)
       return res.status(401).json({ message: 'Invalid refresh token' });
     const accessToken = generateAccessToken({ id: user.id, email: user.email, role: user.role });
-    res.json({ accessToken });
+    res.json({
+      accessToken,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
   } catch (err) {
     next(err);
   }

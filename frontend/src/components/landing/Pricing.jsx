@@ -31,7 +31,7 @@ export default function Pricing() {
               ].join(' ')}
             >
               {plan.badge && (
-                <span className="inline-flex w-fit items-center rounded-full bg-green px-3 py-1 text-[10px] font-bold uppercase text-white">
+                <span className="inline-flex w-fit items-center rounded-full bg-green px-3 py-1 text-eyebrow uppercase text-white">
                   {plan.badge}
                 </span>
               )}
