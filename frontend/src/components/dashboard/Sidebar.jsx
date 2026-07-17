@@ -5,15 +5,10 @@ import Button from '../ui/Button';
 import useFocusTrap from '../../hooks/useFocusTrap';
 
 // Ítems de navegación del sidebar (RF-25, `DESIGN_HANDOFF.md` → "Sidebar").
-// La app real solo expone una página de tareas (`/dashboard`) — no existen
-// rutas separadas de "Mi día"/"Actividad" en el alcance de este spec (spec.md
-// §8 excluye Calendario/Kanban con drag-and-drop y cualquier feature v2.0).
-// "Tareas" es el único ítem con destino real; "Mi día" y "Actividad" quedan
-// como botones enfocables/inertes (visualmente completos según el handoff,
-// sin una página propia que enlazar todavía) — ninguno queda oculto del
-// teclado, solo no navegan a ningún sitio nuevo.
-const STATIC_NAV_ITEMS = ['Mi día', 'Actividad'];
-
+// "Mi día" y "Actividad" no tienen página propia en el alcance de este spec
+// (spec.md §8 excluye Calendario/Kanban y cualquier feature v2.0) y se
+// quitaron del sidebar en vez de dejarlas como botones inertes — un enlace
+// que no lleva a ningún lado se ve como una función rota, no como "próximamente".
 function navLinkClassName({ isActive }) {
   return [
     'rounded-btn px-3 py-2 text-left text-sm font-medium transition-colors',
@@ -27,15 +22,12 @@ function SidebarNav() {
 
   return (
     <nav aria-label="Navegación del panel" className="flex flex-col gap-1">
-      <button type="button" className={navLinkClassName({ isActive: false })}>
-        {STATIC_NAV_ITEMS[0]}
-      </button>
       <NavLink to="/dashboard" className={navLinkClassName}>
         Tareas
       </NavLink>
-      <button type="button" className={navLinkClassName({ isActive: false })}>
-        {STATIC_NAV_ITEMS[1]}
-      </button>
+      <NavLink to="/projects" className={navLinkClassName}>
+        Proyectos
+      </NavLink>
       {/* RF-25: enlace a Admin visible únicamente para role === 'ADMIN' */}
       {user?.role === 'ADMIN' && (
         <NavLink to="/admin" className={navLinkClassName}>
