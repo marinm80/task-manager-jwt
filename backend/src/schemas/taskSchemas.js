@@ -6,6 +6,7 @@ const createTaskSchema = z.object({
   status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
   dueDate: z.string().optional().nullable(),
+  projectId: z.number().int().positive().optional().nullable(),
 });
 
 const updateTaskSchema = createTaskSchema.partial();

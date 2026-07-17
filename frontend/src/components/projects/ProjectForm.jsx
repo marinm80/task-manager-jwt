@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Modal from '../ui/Modal';
@@ -12,6 +12,7 @@ const schema = z.object({
     .max(12)
     .regex(/^[A-Za-z0-9-]+$/, 'Solo letras, números y guiones'),
   description: z.string().max(1000).optional(),
+  initialTasks: z.array(z.object({ title: z.string().max(200) })).optional(),
 });
 
 const INPUT_CLASSES =
@@ -21,12 +22,20 @@ const INPUT_CLASSES =
 export default function ProjectForm({ onClose, onSubmit }) {
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm({ resolver: zodResolver(schema) });
+  } = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: { initialTasks: [{ title: '' }] },
+  });
+  const { fields, append, remove } = useFieldArray({ control, name: 'initialTasks' });
 
   const submit = async (data) => {
-    await onSubmit(data);
+    const initialTasks = (data.initialTasks ?? [])
+      .map((item) => item.title.trim())
+      .filter(Boolean);
+    await onSubmit({ ...data, initialTasks });
     onClose();
   };
 
@@ -69,6 +78,29 @@ export default function ProjectForm({ onClose, onSubmit }) {
             className={INPUT_CLASSES}
             rows={3}
           />
+        </div>
+
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted">Primeras tareas (opcional)</p>
+          <div className="space-y-2">
+            {fields.map((field, index) => (
+              <div key={field.id} className="flex gap-2">
+                <input
+                  {...register(`initialTasks.${index}.title`)}
+                  placeholder={`Tarea ${index + 1}`}
+                  className={INPUT_CLASSES}
+                />
+                {fields.length > 1 && (
+                  <Button type="button" variant="ghost" size="md" iconOnly aria-label="Quitar tarea" onClick={() => remove(index)}>
+                    ×
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+          <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => append({ title: '' })}>
+            + Agregar otra tarea
+          </Button>
         </div>
 
         <div className="flex justify-end gap-3 pt-2">

@@ -36,6 +36,12 @@ export default function TaskCard({ task, onEdit, layout = 'list' }) {
           <Badge kind="status" value={task.status} />
         </div>
 
+        {task.project && (
+          <span className="inline-flex w-fit items-center rounded-full bg-mint px-2 py-0.5 font-mono text-[10px] font-bold text-green">
+            {task.project.key}
+          </span>
+        )}
+
         {task.description && <p className="line-clamp-2 text-xs text-muted">{task.description}</p>}
 
         <div className="flex items-center gap-3 text-xs">

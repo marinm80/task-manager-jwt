@@ -1,6 +1,7 @@
 import api from '../utils/axiosConfig';
 
 const projectService = {
+  getMyProjects: () => api.get('/projects'),
   getOrganizations: () => api.get('/organizations'),
   getProjects: (organizationId) => api.get(`/organizations/${organizationId}/projects`),
   createProject: (organizationId, data) => api.post(`/organizations/${organizationId}/projects`, data),

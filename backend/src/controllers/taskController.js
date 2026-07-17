@@ -2,6 +2,20 @@ const prisma = require('../config/db');
 const { createTaskSchema, updateTaskSchema } = require('../schemas/taskSchemas');
 const { exportTasksToCSV } = require('../utils/csvExporter');
 
+const projectInclude = { project: { select: { id: true, name: true, key: true } } };
+
+// Un usuario solo puede asignar/mover sus tareas personales hacia proyectos
+// de los que ya es miembro (crear un proyecto te vuelve LEAD automáticamente,
+// ver organizationController.createProject) — evita que alguien enlace una
+// tarea propia a un proyecto ajeno solo por adivinar su id.
+const assertProjectAccess = async (projectId, userId, role) => {
+  if (role === 'ADMIN') return true;
+  const membership = await prisma.projectMember.findUnique({
+    where: { projectId_userId: { projectId, userId } },
+  });
+  return Boolean(membership);
+};
+
 const getTasks = async (req, res, next) => {
   try {
     const { status, priority, search, page = '1', limit = '10' } = req.query;
@@ -16,7 +30,7 @@ const getTasks = async (req, res, next) => {
     }
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const [tasks, total] = await Promise.all([
-      prisma.task.findMany({ where, skip, take: parseInt(limit), orderBy: { createdAt: 'desc' } }),
+      prisma.task.findMany({ where, skip, take: parseInt(limit), orderBy: { createdAt: 'desc' }, include: projectInclude }),
       prisma.task.count({ where }),
     ]);
     res.json({ tasks, total, page: parseInt(page), limit: parseInt(limit) });
@@ -29,7 +43,13 @@ const createTask = async (req, res, next) => {
   try {
     const data = createTaskSchema.parse(req.body);
     if (data.dueDate) data.dueDate = new Date(data.dueDate);
-    const task = await prisma.task.create({ data: { ...data, userId: req.user.id } });
+    if (data.projectId && !(await assertProjectAccess(data.projectId, req.user.id, req.user.role))) {
+      return res.status(403).json({ message: 'No perteneces a ese proyecto' });
+    }
+    const task = await prisma.task.create({
+      data: { ...data, userId: req.user.id, createdById: req.user.id },
+      include: projectInclude,
+    });
     res.status(201).json(task);
   } catch (err) {
     next(err);
@@ -45,7 +65,10 @@ const updateTask = async (req, res, next) => {
       return res.status(403).json({ message: 'Forbidden' });
     const data = updateTaskSchema.parse(req.body);
     if (data.dueDate) data.dueDate = new Date(data.dueDate);
-    const task = await prisma.task.update({ where: { id }, data });
+    if (data.projectId && !(await assertProjectAccess(data.projectId, req.user.id, req.user.role))) {
+      return res.status(403).json({ message: 'No perteneces a ese proyecto' });
+    }
+    const task = await prisma.task.update({ where: { id }, data, include: projectInclude });
     res.json(task);
   } catch (err) {
     next(err);

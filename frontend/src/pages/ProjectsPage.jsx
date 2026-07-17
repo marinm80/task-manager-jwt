@@ -80,10 +80,14 @@ export default function ProjectsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  const handleCreateProject = async (data) => {
+  const handleCreateProject = async ({ initialTasks, ...data }) => {
     try {
       const { data: created } = await projectService.createProject(organizationId, data);
-      showToast('success', `Proyecto "${created.name}" creado.`);
+      if (initialTasks?.length) {
+        await Promise.all(initialTasks.map((title) => projectService.createProjectTask(created.id, { title })));
+      }
+      const tasksNote = initialTasks?.length ? ` con ${initialTasks.length} tarea${initialTasks.length !== 1 ? 's' : ''}` : '';
+      showToast('success', `Proyecto "${created.name}" creado${tasksNote}.`);
       await loadProjects(organizationId, String(created.id));
     } catch (err) {
       showToast('error', err.response?.data?.message ?? 'No pudimos crear el proyecto.');

@@ -1,6 +1,7 @@
 const express = require('express');
 const authenticate = require('../middleware/authMiddleware');
 const {
+  getMyProjects,
   getProject,
   updateProject,
   getProjectMembers,
@@ -13,6 +14,7 @@ const {
 
 const router = express.Router();
 router.use(authenticate);
+router.get('/', getMyProjects);
 router.get('/:projectId', getProject);
 router.patch('/:projectId', updateProject);
 router.get('/:projectId/members', getProjectMembers);

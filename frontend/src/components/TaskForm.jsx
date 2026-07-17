@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -6,6 +7,7 @@ import { createTask, updateTask } from '../features/tasks/tasksSlice';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import { PRIORITY_LABELS, STATUS_LABELS } from '../constants/taskLabels';
+import projectService from '../services/projectService';
 
 const schema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
@@ -13,6 +15,7 @@ const schema = z.object({
   status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED']),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']),
   dueDate: z.string().optional(),
+  projectId: z.string().optional(),
 });
 
 const INPUT_CLASSES =
@@ -28,17 +31,23 @@ const INPUT_CLASSES =
 // composición, sin reimplementarlo aquí.
 export default function TaskForm({ task, onClose }) {
   const dispatch = useDispatch();
+  const [projects, setProjects] = useState([]);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: task
-      ? { ...task, dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '' }
-      : { status: 'PENDING', priority: 'MEDIUM' },
+      ? { ...task, dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '', projectId: task.projectId ? String(task.projectId) : '' }
+      : { status: 'PENDING', priority: 'MEDIUM', projectId: '' },
   });
+
+  useEffect(() => {
+    projectService.getMyProjects().then(({ data }) => setProjects(data)).catch(() => setProjects([]));
+  }, []);
 
   const onSubmit = async (data) => {
     const payload = { ...data };
     if (payload.dueDate) payload.dueDate = new Date(payload.dueDate).toISOString();
     else delete payload.dueDate;
+    payload.projectId = payload.projectId ? Number(payload.projectId) : null;
     if (task) await dispatch(updateTask({ id: task.id, data: payload }));
     else await dispatch(createTask(payload));
     onClose();
@@ -104,6 +113,20 @@ export default function TaskForm({ task, onClose }) {
             Fecha límite (opcional)
           </label>
           <input id="task-form-due-date" {...register('dueDate')} type="date" className={INPUT_CLASSES} />
+        </div>
+
+        <div>
+          <label htmlFor="task-form-project" className="mb-1 block text-xs font-medium text-muted">
+            Proyecto (opcional)
+          </label>
+          <select id="task-form-project" {...register('projectId')} className={INPUT_CLASSES}>
+            <option value="">Sin proyecto</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.key} · {project.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="flex justify-end gap-3 pt-2">

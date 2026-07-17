@@ -23,6 +23,23 @@ const loadContext = async (req, res) => {
   return context;
 };
 
+// Lista plana de proyectos del usuario (todas sus organizaciones a la vez),
+// usada por el selector "Proyecto" del formulario de tareas personales —
+// a diferencia de getOrganizationProjects (projectController hermano en
+// organizationController.js), no requiere elegir una organización primero.
+const getMyProjects = async (req, res, next) => {
+  try {
+    const projects = await prisma.project.findMany({
+      where: req.user.role === 'ADMIN' ? {} : { members: { some: { userId: req.user.id } } },
+      select: { id: true, name: true, key: true, organizationId: true },
+      orderBy: { name: 'asc' },
+    });
+    res.json(projects);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getProject = async (req, res, next) => {
   try {
     const context = await loadContext(req, res);
@@ -185,6 +202,7 @@ const deleteProjectTask = async (req, res, next) => {
 };
 
 module.exports = {
+  getMyProjects,
   getProject,
   updateProject,
   getProjectMembers,
