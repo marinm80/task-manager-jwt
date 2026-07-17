@@ -29,6 +29,7 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showProjectForm, setShowProjectForm] = useState(false);
+  const [editProject, setEditProject] = useState(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [editTask, setEditTask] = useState(null);
 
@@ -80,17 +81,39 @@ export default function ProjectsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  const handleCreateProject = async ({ initialTasks, ...data }) => {
+  const handleSubmitProject = async ({ initialTasks, ...data }) => {
     try {
-      const { data: created } = await projectService.createProject(organizationId, data);
-      if (initialTasks?.length) {
-        await Promise.all(initialTasks.map((title) => projectService.createProjectTask(created.id, { title })));
+      if (editProject) {
+        await projectService.updateProject(editProject.id, data);
+        showToast('success', 'Proyecto actualizado.');
+        await loadProjects(organizationId, String(editProject.id));
+        await loadProjectDetail(editProject.id);
+      } else {
+        const { data: created } = await projectService.createProject(organizationId, data);
+        if (initialTasks?.length) {
+          await Promise.all(initialTasks.map((title) => projectService.createProjectTask(created.id, { title })));
+        }
+        const tasksNote = initialTasks?.length ? ` con ${initialTasks.length} tarea${initialTasks.length !== 1 ? 's' : ''}` : '';
+        showToast('success', `Proyecto "${created.name}" creado${tasksNote}.`);
+        await loadProjects(organizationId, String(created.id));
       }
-      const tasksNote = initialTasks?.length ? ` con ${initialTasks.length} tarea${initialTasks.length !== 1 ? 's' : ''}` : '';
-      showToast('success', `Proyecto "${created.name}" creado${tasksNote}.`);
-      await loadProjects(organizationId, String(created.id));
     } catch (err) {
-      showToast('error', err.response?.data?.message ?? 'No pudimos crear el proyecto.');
+      showToast('error', err.response?.data?.message ?? 'No pudimos guardar el proyecto.');
+    }
+  };
+
+  const openCreateProject = () => { setEditProject(null); setShowProjectForm(true); };
+  const openEditProject = () => { setEditProject(project); setShowProjectForm(true); };
+  const closeProjectForm = () => { setShowProjectForm(false); setEditProject(null); };
+
+  const handleDeleteProject = async () => {
+    if (!confirm(`¿Eliminar el proyecto "${project.name}" y todas sus tareas?`)) return;
+    try {
+      await projectService.deleteProject(project.id);
+      showToast('success', 'Proyecto eliminado.');
+      await loadProjects(organizationId);
+    } catch (err) {
+      showToast('error', err.response?.data?.message ?? 'No pudimos eliminar el proyecto.');
     }
   };
 
@@ -166,7 +189,7 @@ export default function ProjectsPage() {
                 ))}
               </select>
             </label>
-            <Button variant="primary" size="md" onClick={() => setShowProjectForm(true)} disabled={!organizationId}>
+            <Button variant="primary" size="md" onClick={openCreateProject} disabled={!organizationId}>
               + Nuevo proyecto
             </Button>
           </div>
@@ -188,7 +211,7 @@ export default function ProjectsPage() {
             title="Todavía no hay proyectos"
             description="Crea tu primer proyecto para agrupar tareas y dar seguimiento a su avance."
             actionLabel="Crear mi primer proyecto"
-            onAction={() => setShowProjectForm(true)}
+            onAction={openCreateProject}
           />
         ) : (
           <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
@@ -235,9 +258,17 @@ export default function ProjectsPage() {
                       <p className="text-eyebrow text-green">Trabajo del proyecto</p>
                       <h2 className="mt-1 text-card-title text-ink">Tareas asignadas ({tasks.length})</h2>
                     </div>
-                    <Button variant="secondary" size="sm" onClick={openCreateTask}>
-                      + Agregar tarea
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button variant="secondary" size="sm" onClick={openCreateTask}>
+                        + Agregar tarea
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={openEditProject}>
+                        Editar proyecto
+                      </Button>
+                      <Button variant="danger" size="sm" onClick={handleDeleteProject}>
+                        Eliminar proyecto
+                      </Button>
+                    </div>
                   </div>
                   {tasks.length === 0 ? (
                     <EmptyState
@@ -262,7 +293,7 @@ export default function ProjectsPage() {
       </div>
 
       {showProjectForm && (
-        <ProjectForm onClose={() => setShowProjectForm(false)} onSubmit={handleCreateProject} />
+        <ProjectForm project={editProject} onClose={closeProjectForm} onSubmit={handleSubmitProject} />
       )}
       {showTaskForm && (
         <ProjectTaskForm task={editTask} onClose={closeTaskForm} onSubmit={handleSubmitTask} />

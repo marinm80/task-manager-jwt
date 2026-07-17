@@ -4,6 +4,7 @@ const {
   getMyProjects,
   getProject,
   updateProject,
+  deleteProject,
   getProjectMembers,
   upsertProjectMember,
   getProjectTasks,
@@ -17,6 +18,7 @@ router.use(authenticate);
 router.get('/', getMyProjects);
 router.get('/:projectId', getProject);
 router.patch('/:projectId', updateProject);
+router.delete('/:projectId', deleteProject);
 router.get('/:projectId/members', getProjectMembers);
 router.put('/:projectId/members', upsertProjectMember);
 router.get('/:projectId/tasks', getProjectTasks);

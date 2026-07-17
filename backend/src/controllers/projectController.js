@@ -67,6 +67,26 @@ const updateProject = async (req, res, next) => {
   }
 };
 
+// Task.project usa onDelete: Restrict (a propósito, para que borrar un
+// proyecto por accidente desde cualquier otro código no arrastre tareas sin
+// querer) — así que hay que vaciar las tareas del proyecto explícitamente
+// antes de poder borrar la fila del proyecto en sí, dentro de una sola
+// transacción para que no quede a medias si algo falla.
+const deleteProject = async (req, res, next) => {
+  try {
+    const context = await loadContext(req, res);
+    if (!context) return;
+    if (!context.capabilities.manageProject) return res.status(403).json({ message: 'Forbidden' });
+    await prisma.$transaction([
+      prisma.task.deleteMany({ where: { projectId: context.project.id } }),
+      prisma.project.delete({ where: { id: context.project.id } }),
+    ]);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getProjectMembers = async (req, res, next) => {
   try {
     const context = await loadContext(req, res);
@@ -205,6 +225,7 @@ module.exports = {
   getMyProjects,
   getProject,
   updateProject,
+  deleteProject,
   getProjectMembers,
   upsertProjectMember,
   getProjectTasks,

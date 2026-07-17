@@ -7,6 +7,7 @@ const projectService = {
   createProject: (organizationId, data) => api.post(`/organizations/${organizationId}/projects`, data),
   getProject: (projectId) => api.get(`/projects/${projectId}`),
   updateProject: (projectId, data) => api.patch(`/projects/${projectId}`, data),
+  deleteProject: (projectId) => api.delete(`/projects/${projectId}`),
   getProjectTasks: (projectId) => api.get(`/projects/${projectId}/tasks`),
   createProjectTask: (projectId, data) => api.post(`/projects/${projectId}/tasks`, data),
   updateProjectTask: (projectId, taskId, data) => api.patch(`/projects/${projectId}/tasks/${taskId}`, data),
