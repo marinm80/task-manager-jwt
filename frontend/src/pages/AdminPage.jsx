@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import api from '../utils/axiosConfig';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import Button from '../components/ui/Button';
+import UserForm from '../components/admin/UserForm';
+import { useToast } from '../components/ui/ToastProvider';
 
 // Mismo vocabulario de tonos que `Badge.jsx`/`MetricCard.jsx` (D-05): solo
 // clases de `tailwind.config.js` extendido, sin colores ad-hoc. `role` no es
@@ -13,13 +16,13 @@ const ROLE_TONE_CLASSES = {
   USER: 'bg-line/40 text-ink',
 };
 
-// Restyle (T-041): conserva exactamente la misma llamada a `GET /admin/users`
-// y `PATCH /admin/users/:id/role` (RF-27); envuelve la página en
-// `DashboardLayout` (T-018) para heredar `Sidebar` + topbar, armonizando
-// visualmente `/admin` con `/dashboard` sin agregar ninguna capacidad nueva.
 export default function AdminPage() {
+  const { showToast } = useToast();
+  const { user: currentUser } = useSelector((state) => state.auth);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editUser, setEditUser] = useState(null);
 
   useEffect(() => {
     api.get('/admin/users').then((res) => {
@@ -34,12 +37,48 @@ export default function AdminPage() {
     setUsers((prev) => prev.map((u) => (u.id === userId ? res.data : u)));
   };
 
+  const openCreate = () => { setEditUser(null); setShowForm(true); };
+  const openEdit = (user) => { setEditUser(user); setShowForm(true); };
+  const closeForm = () => { setShowForm(false); setEditUser(null); };
+
+  const handleSubmit = async (data) => {
+    try {
+      if (editUser) {
+        const res = await api.patch(`/admin/users/${editUser.id}`, data);
+        setUsers((prev) => prev.map((u) => (u.id === editUser.id ? res.data : u)));
+        showToast('success', 'Usuario actualizado.');
+      } else {
+        const res = await api.post('/admin/users', data);
+        setUsers((prev) => [...prev, res.data]);
+        showToast('success', 'Usuario creado.');
+      }
+    } catch (err) {
+      showToast('error', err.response?.data?.message ?? 'No pudimos guardar el usuario.');
+    }
+  };
+
+  const handleDelete = async (user) => {
+    if (!confirm(`¿Eliminar al usuario "${user.name}"?`)) return;
+    try {
+      await api.delete(`/admin/users/${user.id}`);
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      showToast('success', 'Usuario eliminado.');
+    } catch (err) {
+      showToast('error', err.response?.data?.message ?? 'No pudimos eliminar el usuario.');
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <p className="text-eyebrow text-green">Administración</p>
-          <h1 className="mt-2 text-card-title text-ink">Usuarios ({users.length})</h1>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-eyebrow text-green">Administración</p>
+            <h1 className="mt-2 text-card-title text-ink">Usuarios ({users.length})</h1>
+          </div>
+          <Button variant="primary" size="md" onClick={openCreate}>
+            + Nuevo usuario
+          </Button>
         </div>
 
         {loading ? (
@@ -72,9 +111,19 @@ export default function AdminPage() {
                       {new Date(u.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3">
-                      <Button variant="secondary" size="sm" onClick={() => toggleRole(u.id, u.role)}>
-                        Hacer {u.role === 'ADMIN' ? 'usuario' : 'admin'}
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button variant="secondary" size="sm" onClick={() => toggleRole(u.id, u.role)}>
+                          Hacer {u.role === 'ADMIN' ? 'usuario' : 'admin'}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(u)}>
+                          Editar
+                        </Button>
+                        {u.id !== currentUser?.id && (
+                          <Button variant="danger" size="sm" onClick={() => handleDelete(u)}>
+                            Eliminar
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -83,6 +132,8 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      {showForm && <UserForm user={editUser} onClose={closeForm} onSubmit={handleSubmit} />}
     </DashboardLayout>
   );
 }

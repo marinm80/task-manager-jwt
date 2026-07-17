@@ -1,7 +1,13 @@
 const bcrypt = require('bcrypt');
 const prisma = require('../config/db');
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require('../utils/jwt');
-const { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } = require('../schemas/authSchemas');
+const {
+  registerSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  changePasswordSchema,
+} = require('../schemas/authSchemas');
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -122,4 +128,26 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, refresh, logout, forgotPassword, resetPassword };
+// Requiere sesión activa (a diferencia de forgotPassword/resetPassword, que
+// existen justamente para cuando no se tiene acceso a la cuenta): pide la
+// contraseña actual para confirmar que quien cambia la contraseña es el
+// dueño de la sesión, no solo alguien con el accessToken todavía vigente.
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    const valid = await bcrypt.compare(currentPassword, user.password);
+    if (!valid) return res.status(401).json({ message: 'La contraseña actual no es correcta' });
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashed, refreshToken: null },
+    });
+    res.clearCookie('refreshToken');
+    res.json({ message: 'Contraseña actualizada' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { register, login, refresh, logout, forgotPassword, resetPassword, changePassword };

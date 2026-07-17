@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../dashboard/Sidebar';
 import Button from '../ui/Button';
+import ChangePasswordForm from '../ChangePasswordForm';
 import { logoutUser } from '../../features/auth/authSlice';
 
 // Deriva iniciales (máx. 2 letras) del nombre real del usuario para el
@@ -26,6 +27,7 @@ function getInitials(name = '') {
 // escenario BDD de extremo a extremo, no reimplementan el dispatch.
 export default function DashboardLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const { user } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -60,6 +62,9 @@ export default function DashboardLayout({ children }) {
               {getInitials(user?.name)}
             </span>
             <span className="text-sm font-medium text-ink">{user?.name}</span>
+            <Button variant="ghost" size="sm" onClick={() => setShowChangePassword(true)}>
+              Cambiar contraseña
+            </Button>
             <Button variant="secondary" size="sm" onClick={handleLogout}>
               Cerrar sesión
             </Button>
@@ -68,6 +73,8 @@ export default function DashboardLayout({ children }) {
 
         <main className="mx-auto w-full max-w-dashboard flex-1 px-4 py-6 md:px-6">{children}</main>
       </div>
+
+      {showChangePassword && <ChangePasswordForm onClose={() => setShowChangePassword(false)} />}
     </div>
   );
 }
