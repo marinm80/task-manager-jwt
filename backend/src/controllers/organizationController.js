@@ -13,13 +13,18 @@ const getMembership = async (organizationId, userId) =>
 // se reintenta en cada login/getOrganizations sin duplicar nada.
 // `req.user` viene del JWT decodificado (solo id/email/role, sin name), así
 // que el nombre para mostrar se busca en la BD en vez de asumirlo del token.
+const isPersonalOrgPlaceholderName = (name) => name === 'Proyectos de undefined' || /^Proyectos de /.test(name);
+
 const ensurePersonalOrganization = async (user) => {
   const slug = `personal-${user.id}`;
   const existing = await prisma.organization.findUnique({ where: { slug } });
-  if (existing && existing.name !== 'Proyectos de undefined') return existing;
+  if (existing && !isPersonalOrgPlaceholderName(existing.name)) return existing;
 
+  // El nombre NO lleva el prefijo "Proyectos de": la página ya antepone
+  // "Proyectos de {org.name}" en su título, así que un nombre aquí como
+  // "Proyectos de X" duplicaría la frase ("Proyectos de Proyectos de X").
   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { name: true } });
-  const displayName = `Proyectos de ${dbUser?.name ?? 'mi cuenta'}`;
+  const displayName = dbUser?.name ?? 'Mi cuenta';
 
   if (existing) {
     return prisma.organization.update({ where: { id: existing.id }, data: { name: displayName } });
