@@ -15,6 +15,10 @@ const updateUserSchema = z.object({
   role: z.enum(['USER', 'ADMIN']).optional(),
 });
 
+const resetPasswordSchema = z.object({
+  newPassword: z.string().min(8).max(100),
+});
+
 const USER_SELECT = { id: true, name: true, email: true, role: true, createdAt: true };
 
 const getUsers = async (req, res, next) => {
@@ -113,4 +117,32 @@ const deleteUser = async (req, res, next) => {
   }
 };
 
-module.exports = { getUsers, getUserTasks, updateUserRole, createUser, updateUser, deleteUser };
+// A diferencia de authController.changePassword (self-service, exige la
+// contraseña actual), esto es para cuando el admin resetea la cuenta de
+// alguien más — no tiene forma de conocer la contraseña actual, así que no
+// se le pide. Igual invalida el refreshToken del usuario objetivo para que
+// cualquier sesión ya abierta con la contraseña vieja quede cortada.
+const resetUserPassword = async (req, res, next) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { newPassword } = resetPasswordSchema.parse(req.body);
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashed, refreshToken: null },
+    });
+    res.json({ message: 'Password reset' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = {
+  getUsers,
+  getUserTasks,
+  updateUserRole,
+  createUser,
+  updateUser,
+  deleteUser,
+  resetUserPassword,
+};

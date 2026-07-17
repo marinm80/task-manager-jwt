@@ -4,6 +4,7 @@ import api from '../utils/axiosConfig';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import Button from '../components/ui/Button';
 import UserForm from '../components/admin/UserForm';
+import ResetPasswordForm from '../components/admin/ResetPasswordForm';
 import { useToast } from '../components/ui/ToastProvider';
 
 // Mismo vocabulario de tonos que `Badge.jsx`/`MetricCard.jsx` (D-05): solo
@@ -23,6 +24,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState(null);
 
   useEffect(() => {
     api.get('/admin/users').then((res) => {
@@ -54,6 +56,15 @@ export default function AdminPage() {
       }
     } catch (err) {
       showToast('error', err.response?.data?.message ?? 'No pudimos guardar el usuario.');
+    }
+  };
+
+  const handleResetPassword = async (newPassword) => {
+    try {
+      await api.patch(`/admin/users/${resetPasswordUser.id}/password`, { newPassword });
+      showToast('success', `Contraseña de ${resetPasswordUser.name} restablecida.`);
+    } catch (err) {
+      showToast('error', err.response?.data?.message ?? 'No pudimos restablecer la contraseña.');
     }
   };
 
@@ -119,9 +130,14 @@ export default function AdminPage() {
                           Editar
                         </Button>
                         {u.id !== currentUser?.id && (
-                          <Button variant="danger" size="sm" onClick={() => handleDelete(u)}>
-                            Eliminar
-                          </Button>
+                          <>
+                            <Button variant="ghost" size="sm" onClick={() => setResetPasswordUser(u)}>
+                              Restablecer contraseña
+                            </Button>
+                            <Button variant="danger" size="sm" onClick={() => handleDelete(u)}>
+                              Eliminar
+                            </Button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -134,6 +150,13 @@ export default function AdminPage() {
       </div>
 
       {showForm && <UserForm user={editUser} onClose={closeForm} onSubmit={handleSubmit} />}
+      {resetPasswordUser && (
+        <ResetPasswordForm
+          user={resetPasswordUser}
+          onClose={() => setResetPasswordUser(null)}
+          onSubmit={handleResetPassword}
+        />
+      )}
     </DashboardLayout>
   );
 }

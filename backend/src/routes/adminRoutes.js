@@ -6,6 +6,7 @@ const {
   createUser,
   updateUser,
   deleteUser,
+  resetUserPassword,
 } = require('../controllers/adminController');
 const authenticate = require('../middleware/authMiddleware');
 const requireRole = require('../middleware/roleMiddleware');
@@ -19,6 +20,7 @@ router.post('/users', createUser);
 router.get('/users/:id/tasks', getUserTasks);
 router.patch('/users/:id/role', updateUserRole);
 router.patch('/users/:id', updateUser);
+router.patch('/users/:id/password', resetUserPassword);
 router.delete('/users/:id', deleteUser);
 
 module.exports = router;
