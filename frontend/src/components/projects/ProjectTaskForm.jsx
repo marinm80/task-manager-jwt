@@ -17,14 +17,16 @@ const INPUT_CLASSES =
   'w-full rounded-btn border border-line bg-surface px-3 py-2 text-sm text-ink ' +
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green';
 
-export default function ProjectTaskForm({ onClose, onSubmit }) {
+export default function ProjectTaskForm({ task, onClose, onSubmit }) {
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { status: 'PENDING', priority: 'MEDIUM' },
+    defaultValues: task
+      ? { ...task, dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '' }
+      : { status: 'PENDING', priority: 'MEDIUM' },
   });
 
   const submit = async (data) => {
@@ -39,7 +41,7 @@ export default function ProjectTaskForm({ onClose, onSubmit }) {
     <Modal open onClose={onClose} labelledBy="project-task-form-title">
       <form onSubmit={handleSubmit(submit)} className="space-y-4">
         <h2 id="project-task-form-title" className="text-card-title text-ink">
-          Nueva tarea del proyecto
+          {task ? 'Editar tarea' : 'Nueva tarea del proyecto'}
         </h2>
 
         <div>
@@ -107,7 +109,7 @@ export default function ProjectTaskForm({ onClose, onSubmit }) {
             Cancelar
           </Button>
           <Button type="submit" variant="primary" size="md" isLoading={isSubmitting} disabled={isSubmitting}>
-            Crear
+            {task ? 'Guardar' : 'Crear'}
           </Button>
         </div>
       </form>

@@ -9,7 +9,8 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: 'short' }).format(new Date(value));
 }
 
-export default function ProjectTaskTable({ tasks, onAdvanceStatus }) {
+export default function ProjectTaskTable({ tasks, onAdvanceStatus, onEdit, onDelete }) {
+  const showActions = onAdvanceStatus || onEdit || onDelete;
   return (
     <div className="overflow-hidden rounded-card border border-line bg-surface">
       <div className="overflow-x-auto">
@@ -21,7 +22,7 @@ export default function ProjectTaskTable({ tasks, onAdvanceStatus }) {
               <th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3">Prioridad</th>
               <th className="px-4 py-3">Vence</th>
-              {onAdvanceStatus && <th className="px-4 py-3" />}
+              {showActions && <th className="px-4 py-3" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -35,11 +36,25 @@ export default function ProjectTaskTable({ tasks, onAdvanceStatus }) {
                 <td className="whitespace-nowrap px-4 py-3"><Badge kind="status" value={task.status} /></td>
                 <td className="whitespace-nowrap px-4 py-3"><Badge kind="priority" value={task.priority} /></td>
                 <td className="whitespace-nowrap px-4 py-3 text-muted">{formatDate(task.dueDate)}</td>
-                {onAdvanceStatus && (
+                {showActions && (
                   <td className="whitespace-nowrap px-4 py-3">
-                    <Button variant="secondary" size="sm" onClick={() => onAdvanceStatus(task, NEXT_STATUS[task.status])}>
-                      → {NEXT_STATUS_LABEL[task.status]}
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {onAdvanceStatus && (
+                        <Button variant="secondary" size="sm" onClick={() => onAdvanceStatus(task, NEXT_STATUS[task.status])}>
+                          → {NEXT_STATUS_LABEL[task.status]}
+                        </Button>
+                      )}
+                      {onEdit && (
+                        <Button variant="ghost" size="sm" onClick={() => onEdit(task)}>
+                          Editar
+                        </Button>
+                      )}
+                      {onDelete && (
+                        <Button variant="danger" size="sm" onClick={() => onDelete(task)}>
+                          Eliminar
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 )}
               </tr>

@@ -30,6 +30,7 @@ export default function ProjectsPage() {
   const [error, setError] = useState('');
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
+  const [editTask, setEditTask] = useState(null);
 
   useEffect(() => {
     projectService.getOrganizations()
@@ -89,13 +90,33 @@ export default function ProjectsPage() {
     }
   };
 
-  const handleCreateTask = async (data) => {
+  const handleSubmitTask = async (data) => {
     try {
-      await projectService.createProjectTask(projectId, data);
-      showToast('success', 'Tarea agregada al proyecto.');
+      if (editTask) {
+        await projectService.updateProjectTask(projectId, editTask.id, data);
+        showToast('success', 'Tarea actualizada.');
+      } else {
+        await projectService.createProjectTask(projectId, data);
+        showToast('success', 'Tarea agregada al proyecto.');
+      }
       await loadProjectDetail(projectId);
     } catch (err) {
-      showToast('error', err.response?.data?.message ?? 'No pudimos crear la tarea.');
+      showToast('error', err.response?.data?.message ?? 'No pudimos guardar la tarea.');
+    }
+  };
+
+  const openCreateTask = () => { setEditTask(null); setShowTaskForm(true); };
+  const openEditTask = (task) => { setEditTask(task); setShowTaskForm(true); };
+  const closeTaskForm = () => { setShowTaskForm(false); setEditTask(null); };
+
+  const handleDeleteTask = async (task) => {
+    if (!confirm(`¿Eliminar la tarea "${task.title}"?`)) return;
+    try {
+      await projectService.deleteProjectTask(projectId, task.id);
+      showToast('success', 'Tarea eliminada.');
+      setTasks((current) => current.filter((item) => item.id !== task.id));
+    } catch (err) {
+      showToast('error', err.response?.data?.message ?? 'No pudimos eliminar la tarea.');
     }
   };
 
@@ -210,7 +231,7 @@ export default function ProjectsPage() {
                       <p className="text-eyebrow text-green">Trabajo del proyecto</p>
                       <h2 className="mt-1 text-card-title text-ink">Tareas asignadas ({tasks.length})</h2>
                     </div>
-                    <Button variant="secondary" size="sm" onClick={() => setShowTaskForm(true)}>
+                    <Button variant="secondary" size="sm" onClick={openCreateTask}>
                       + Agregar tarea
                     </Button>
                   </div>
@@ -219,10 +240,15 @@ export default function ProjectsPage() {
                       title="Sin tareas todavía"
                       description="Agrega la primera tarea de este proyecto."
                       actionLabel="Agregar tarea"
-                      onAction={() => setShowTaskForm(true)}
+                      onAction={openCreateTask}
                     />
                   ) : (
-                    <ProjectTaskTable tasks={tasks} onAdvanceStatus={handleAdvanceStatus} />
+                    <ProjectTaskTable
+                      tasks={tasks}
+                      onAdvanceStatus={handleAdvanceStatus}
+                      onEdit={openEditTask}
+                      onDelete={handleDeleteTask}
+                    />
                   )}
                 </div>
               </section>
@@ -235,7 +261,7 @@ export default function ProjectsPage() {
         <ProjectForm onClose={() => setShowProjectForm(false)} onSubmit={handleCreateProject} />
       )}
       {showTaskForm && (
-        <ProjectTaskForm onClose={() => setShowTaskForm(false)} onSubmit={handleCreateTask} />
+        <ProjectTaskForm task={editTask} onClose={closeTaskForm} onSubmit={handleSubmitTask} />
       )}
     </DashboardLayout>
   );

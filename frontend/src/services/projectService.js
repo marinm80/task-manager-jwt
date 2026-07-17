@@ -9,6 +9,7 @@ const projectService = {
   getProjectTasks: (projectId) => api.get(`/projects/${projectId}/tasks`),
   createProjectTask: (projectId, data) => api.post(`/projects/${projectId}/tasks`, data),
   updateProjectTask: (projectId, taskId, data) => api.patch(`/projects/${projectId}/tasks/${taskId}`, data),
+  deleteProjectTask: (projectId, taskId) => api.delete(`/projects/${projectId}/tasks/${taskId}`),
 };
 
 export default projectService;
