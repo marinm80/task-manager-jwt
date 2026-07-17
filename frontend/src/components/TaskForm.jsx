@@ -32,15 +32,27 @@ const INPUT_CLASSES =
 export default function TaskForm({ task, onClose }) {
   const dispatch = useDispatch();
   const [projects, setProjects] = useState([]);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: task
       ? { ...task, dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '', projectId: task.projectId ? String(task.projectId) : '' }
       : { status: 'PENDING', priority: 'MEDIUM', projectId: '' },
   });
 
+  // El <select> de proyecto solo tiene la opción "Sin proyecto" en el primer
+  // render (la lista real llega async); si el navegador intenta seleccionar
+  // un value que todavía no existe como <option>, cae al primero disponible
+  // y se queda ahí — defaultValues no lo corrige retroactivamente porque
+  // este es un input no controlado (`register`). Forzamos el valor correcto
+  // una vez que las opciones ya están en el DOM.
   useEffect(() => {
-    projectService.getMyProjects().then(({ data }) => setProjects(data)).catch(() => setProjects([]));
+    projectService.getMyProjects()
+      .then(({ data }) => {
+        setProjects(data);
+        if (task?.projectId) setValue('projectId', String(task.projectId));
+      })
+      .catch(() => setProjects([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onSubmit = async (data) => {
