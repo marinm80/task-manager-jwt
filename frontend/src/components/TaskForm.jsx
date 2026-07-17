@@ -39,21 +39,24 @@ export default function TaskForm({ task, onClose }) {
       : { status: 'PENDING', priority: 'MEDIUM', projectId: '' },
   });
 
+  useEffect(() => {
+    projectService.getMyProjects().then(({ data }) => setProjects(data)).catch(() => setProjects([]));
+  }, []);
+
   // El <select> de proyecto solo tiene la opción "Sin proyecto" en el primer
   // render (la lista real llega async); si el navegador intenta seleccionar
   // un value que todavía no existe como <option>, cae al primero disponible
   // y se queda ahí — defaultValues no lo corrige retroactivamente porque
-  // este es un input no controlado (`register`). Forzamos el valor correcto
-  // una vez que las opciones ya están en el DOM.
+  // este es un input no controlado (`register`). Este efecto corre DESPUÉS
+  // del render que ya agregó las opciones reales al DOM (depende de
+  // `projects`, no se dispara junto con el fetch), así que para cuando
+  // llama a setValue la opción correcta ya existe para seleccionar.
   useEffect(() => {
-    projectService.getMyProjects()
-      .then(({ data }) => {
-        setProjects(data);
-        if (task?.projectId) setValue('projectId', String(task.projectId));
-      })
-      .catch(() => setProjects([]));
+    if (task?.projectId && projects.some((project) => project.id === task.projectId)) {
+      setValue('projectId', String(task.projectId));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [projects]);
 
   const onSubmit = async (data) => {
     const payload = { ...data };
