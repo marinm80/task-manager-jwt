@@ -11,13 +11,22 @@ const getMembership = async (organizationId, userId) =>
 // tener que entender el concepto de "organización" (no hay UI para crearlas
 // a mano). El slug es determinístico por userId, así que esto es idempotente:
 // se reintenta en cada login/getOrganizations sin duplicar nada.
+// `req.user` viene del JWT decodificado (solo id/email/role, sin name), así
+// que el nombre para mostrar se busca en la BD en vez de asumirlo del token.
 const ensurePersonalOrganization = async (user) => {
   const slug = `personal-${user.id}`;
   const existing = await prisma.organization.findUnique({ where: { slug } });
-  if (existing) return existing;
+  if (existing && existing.name !== 'Proyectos de undefined') return existing;
+
+  const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { name: true } });
+  const displayName = `Proyectos de ${dbUser?.name ?? 'mi cuenta'}`;
+
+  if (existing) {
+    return prisma.organization.update({ where: { id: existing.id }, data: { name: displayName } });
+  }
   return prisma.$transaction(async (tx) => {
     const organization = await tx.organization.create({
-      data: { name: `Proyectos de ${user.name}`, slug, description: 'Espacio personal' },
+      data: { name: displayName, slug, description: 'Espacio personal' },
     });
     await tx.organizationMember.create({
       data: { organizationId: organization.id, userId: user.id, role: 'OWNER' },
