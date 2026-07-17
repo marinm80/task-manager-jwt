@@ -6,6 +6,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import AdminPage from './pages/AdminPage';
+import ProjectsPage from './pages/ProjectsPage';
 import PrivateRoute from './components/PrivateRoute';
 import SessionBootstrap from './components/SessionBootstrap';
 
@@ -20,6 +21,7 @@ export default function App() {
       <Route element={<SessionBootstrap />}>
         <Route element={<PrivateRoute />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/projects" element={<ProjectsPage />} />
         </Route>
         <Route element={<PrivateRoute requiredRole="ADMIN" />}>
           <Route path="/admin" element={<AdminPage />} />

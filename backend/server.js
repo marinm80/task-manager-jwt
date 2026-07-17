@@ -8,6 +8,8 @@ const rateLimit = require('express-rate-limit');
 const authRoutes = require('./src/routes/authRoutes');
 const taskRoutes = require('./src/routes/taskRoutes');
 const adminRoutes = require('./src/routes/adminRoutes');
+const organizationRoutes = require('./src/routes/organizationRoutes');
+const projectRoutes = require('./src/routes/projectRoutes');
 const errorHandler = require('./src/middleware/errorHandler');
 
 const app = express();
@@ -29,6 +31,8 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/organizations', organizationRoutes);
+app.use('/api/projects', projectRoutes);
 
 app.use(errorHandler);
 
